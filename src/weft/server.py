@@ -20,6 +20,8 @@ from . import __version__
 from .config import Config, load
 from .fastloop.lint import lint as run_lint
 from .fastloop.simulate import simulate as run_simulate
+from .index import indexer
+from .index.store import SymbolStore
 from .jobs import JobStore
 from .quartus import flow, project, reports
 from .quartus.install import Install, InstallError, probe
@@ -30,6 +32,12 @@ MAX_DIAGNOSTICS = 100
 
 #: Default number of log lines get_job_log hands back.
 DEFAULT_LOG_TAIL = 100
+
+#: Default number of search hits returned.
+DEFAULT_SEARCH_HITS = 20
+
+#: State WEFT keeps inside the workspace, matching config.STATE_DIR.
+STATE_DIR = ".weft"
 
 CONFIG_ENV = "WEFT_CONFIG"
 DEFAULT_CONFIG = Path("~/.config/weft/weft.toml")
@@ -345,6 +353,81 @@ def build(config: Config) -> MCPServer:
         """
         directory, revision = located(project_ref)
         return asdict(reports.parse_reports(directory, revision))
+
+    symbols = SymbolStore(config.workspace / STATE_DIR / "symbols.sqlite")
+
+    @server.tool(
+        description=(
+            "Index a directory of HDL: modules and entities, their ports, parameters "
+            "and instantiations, from Verible and GHDL. On demand only; nothing "
+            "watches the filesystem. Files whose content has not changed are skipped."
+        )
+    )
+    def index_project(directory: str) -> dict[str, Any]:
+        """index_project - read a directory of sources into the symbol index
+
+        @directory: workspace-relative directory
+
+        Return: how many modules were found and which files were read,
+        skipped, dropped or rejected by a parser.
+        """
+        report = indexer.index_project(config.image, config.workspace, directory, symbols)
+        return asdict(report) | {"indexed": symbols.stats()}
+
+    @server.tool(
+        description=(
+            "Search the symbol index by name or declared type. Matching is textual "
+            "over module, port, parameter and instance names; it does not rank by "
+            "meaning."
+        )
+    )
+    def search_code(query: str, top_k: int = DEFAULT_SEARCH_HITS) -> dict[str, Any]:
+        """search_code - find where a name or type appears
+
+        @query: substring, matched without regard to case
+        @top_k: how many hits to return
+
+        Return: the hits, and how many were returned.
+        """
+        hits = symbols.search(query, limit=top_k)
+        return {"count": len(hits), "hits": [asdict(h) for h in hits]}
+
+    @server.tool(
+        description=(
+            "Ports, parameters, instantiations and definition location of one module "
+            "or entity, together with the modules that instantiate it."
+        )
+    )
+    def get_module_info(name: str) -> dict[str, Any]:
+        """get_module_info - everything indexed about one module
+
+        @name: module or entity name, matched without regard to case, because
+               GHDL folds VHDL identifiers and Verilog keeps its own
+
+        Return: the module and its dependents, or a not-indexed marker.
+        """
+        module = symbols.module(name)
+        if module is None:
+            return {"name": name, "indexed": False}
+        return asdict(module) | {"indexed": True, "instantiated_by": symbols.dependents(name)}
+
+    @server.tool(
+        description=(
+            "The instance tree below a module. An instance whose module is not "
+            "indexed is reported with resolved false rather than dropped."
+        )
+    )
+    def get_hierarchy(top: str) -> dict[str, Any]:
+        """get_hierarchy - the instance tree under @top
+
+        @top: module or entity name
+
+        Return: the tree, or a not-indexed marker.
+        """
+        tree = symbols.hierarchy(top)
+        if tree is None:
+            return {"top": top, "indexed": False}
+        return tree
 
     return server
 
