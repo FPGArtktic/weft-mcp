@@ -1,0 +1,68 @@
+# SPDX-License-Identifier: GPL-3.0-only
+#
+# What every push has to pass. Three jobs, because a failure should say which
+# of the three kinds of thing broke without anyone reading a log to find out.
+#
+# The container tests skip themselves when the weft-tools image is absent, and
+# it is absent here: building it compiles GHDL from source, which is minutes of
+# runner time on every push to prove something the image build itself proves.
+# The unit tests mock the container boundary, so what runs here is the logic.
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: ruff
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff
+      - run: ruff check .
+      - run: ruff format --check .
+
+  test:
+    name: pytest (${{ matrix.python }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        # The floor is what pyproject requires; the ceiling is what a user is
+        # likely to have. A break on either end is a break.
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install -e ".[dev]"
+      - run: pytest -q
+
+  docs:
+    name: sphinx
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[docs]"
+      # Warnings are errors. The tool and configuration references are
+      # generated from the code, and a key added without a description fails
+      # here rather than shipping a reference that is quietly incomplete.
+      - run: sphinx-build -W --keep-going -b html Documentation _build/html

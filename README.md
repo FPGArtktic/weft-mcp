@@ -2,6 +2,10 @@
 
 # WEFT — WEFT Elaborates FPGA Toolchains
 
+[![ci](https://github.com/FPGArtktic/weft-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/FPGArtktic/weft-mcp/actions/workflows/ci.yml)
+[![docs](https://readthedocs.org/projects/weft-mcp/badge/?version=latest)](https://weft-mcp.readthedocs.io/en/latest/)
+[![licence: GPL-3.0-only](https://img.shields.io/badge/licence-GPL--3.0--only-blue.svg)](COPYING)
+
 An MCP server that gives an LLM client a safe, structured interface to an
 Intel Quartus Prime 25.1 FPGA flow: lint and simulate in seconds, compile
 asynchronously, and read results back as JSON instead of megabytes of log.
@@ -259,6 +263,160 @@ Building that deployment — the inference cluster, the serving stack, carrying
 the image and the wheels across the gap — is not part of this repository.
 Appendix A of [PROJECT.md](PROJECT.md) records what it would take and stops
 there, deliberately.
+
+## Your first session, if this is all new
+
+You do not type tool calls. This trips up everybody once, so let us get it out
+of the way: you talk to the model in ordinary sentences, the model decides
+which of WEFT's tools to call and with what arguments, and the client sends the
+call. The JSON in this README is what goes over the wire. You never write it.
+
+What follows is a real first session against the project bundled in this
+repository. It needs no FPGA board and, for the first half, no Quartus either.
+
+### 1. Point the workspace at something
+
+```toml
+[workspace]
+root = "/home/you/weft-mcp/examples/counter"
+
+[container]
+image = "weft-tools"
+```
+
+That directory is the entire world as far as WEFT is concerned. A path that
+resolves outside it is refused — symlinks resolved first, so the obvious trick
+does not work either. If you get "path escapes the workspace", that is not a
+bug, that is the sandbox doing the one job it has.
+
+### 2. Ask for something
+
+Start your client and type:
+
+> Lint the counter design.
+
+The model calls `lint` with the source list. On this project Verilator answers:
+
+```
+error MODMISSING: Cannot find file containing module: 'seven_seg_decoder'
+excluded: ["src/seven_seg_decoder.vhd"]
+```
+
+Read that carefully, because it teaches you more than a clean run would. The
+module is not missing. It is written in VHDL, Verilator does not read VHDL, and
+WEFT told you exactly which file it had to leave out instead of pretending the
+question was answered. If you have Questa configured, say *lint it with Questa*
+and the whole thing checks clean, both languages at once.
+
+### 3. Run a testbench
+
+> Run the up/down counter testbench.
+
+```
+passed: true   simulator: verilator
+[155000] PASS: counts down when up is low
+[165000] PASS: clear beats enable
+[175000] PASS: wraps downwards
+=== TEST PASSED ===
+waveform: .weft/waves/updown_counter_tb.vcd
+```
+
+The waveform is a real file on your disk. Open it in GTKWave. WEFT does not
+pretend to show it to you.
+
+Now try the top-level one:
+
+> Run the counter_top testbench.
+
+```
+passed: false
+excluded: ["src/seven_seg_decoder.vhd"]
+%Error: ... /tmp/weft-build/seven_seg_decoder.sv
+```
+
+It fails, and it fails honestly. Verilator was handed a design whose display
+decoder is VHDL, could not read it, said which file it dropped, and then
+tripped over the module that was consequently missing. Ask for it *with Questa*
+and it passes, all three languages elaborated together, `excluded` empty. That
+is the one thing a proprietary simulator buys you here and the reason it is
+wired in at all.
+
+### 4. Ask about the design
+
+> What does the debouncer's rise_pulse port do?
+
+The model calls `index_project` once, then `get_module_info`. The answer —
+"one cycle high on every 0 -> 1 edge of clean_out" — is not the model's guess.
+It is the line the author wrote in the header comment above the module, parsed
+out of the source. That is the whole point of the exercise: you can tell the
+difference between what was read and what was invented, because WEFT only
+returns the former.
+
+### 5. Compile it (this part needs Quartus)
+
+> Compile the counter project.
+
+Compilation does not block. You get a job id back immediately, because a
+Quartus compile takes minutes and a tool call that sits there for four of them
+is a tool call that times out. Ask *how is it going* and the model calls
+`get_job_status`. Kill the server mid-compile and restart it — the job is still
+there, and its final status is still correct. That was not free to build, and
+it is the difference between a toy and something you can leave running.
+
+When it finishes:
+
+> Summarise the compilation.
+
+```
+Status: Successful. Timing met on 1 of 1 clock. 2 critical warnings to look at.
+Device            10M04SAE144A7G
+Fullest resource  20 %
+Worst slack       0.144 ns (Hold, clk)
+Lowest Fmax       154.23 MHz (clk)
+```
+
+Every one of those numbers came out of a `.rpt` file. None was rounded, guessed
+or summarised by a language model on the way.
+
+### Four things that will bite you
+
+**Nothing happens automatically.** No watcher, no background indexing, no scan
+at startup. `index_project` reads a directory when you ask. `index_document`
+reads one PDF when you ask. If a search comes back empty, the usual reason is
+that you never indexed the thing. Ask *what documents are indexed* — the answer
+also lists what is sitting in your library that is not.
+
+**Paths are workspace-relative, always.** `src/counter_top.sv`, not
+`/home/you/...`. Both work, the second only because it is checked and rewritten,
+and if it lands outside the root it is refused.
+
+**The model is still a model.** WEFT does not make it right. It makes it
+*checkable*: every claim it repeats back to you came from a tool, and you can
+run the same tool yourself and get the same answer. When it tells you your
+timing closed, that came from the timing analyser. When it tells you your design
+is elegant, that came from nowhere.
+
+**Read the `excluded` and the `retrieval` fields.** They are there because a
+result that quietly answered a narrower question than you asked is worse than
+no result. `excluded` names sources a tool could not read. `retrieval` says
+whether a document search was semantic or a substring match — those rank
+differently, and a ranking you misread is a citation you will misuse.
+
+### When it goes wrong
+
+Nothing here needs the network at runtime, so a hang is local. In order of how
+often it is actually the cause:
+
+- **The container is not built.** `podman build -t weft-tools -f containers/Containerfile.weft-tools .`
+- **The workspace root does not exist**, or the path you gave is outside it.
+- **Quartus is not configured.** Lint and simulate do not need it. Everything
+  with `compile` or `project` in the name does, and WEFT will not go looking
+  for it on `PATH` — the configuration says where it is or it does not run.
+- **A key in the config is misspelled.** WEFT refuses unknown keys at startup
+  rather than ignoring them, so you get told, with the key name.
+
+Raw logs stay on disk. `get_job_log` fetches the tail of one by name. If you
+want the whole thing, it is in `output_files/` where Quartus left it.
 
 ## Simulating a mixed-language design
 
