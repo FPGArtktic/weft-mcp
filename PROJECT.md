@@ -188,7 +188,7 @@ The same structure applies to VHDL entities using `--` comments. `generate_docs`
   traffic compared with tensor-parallel all-reduces, but they are on the critical
   path of every token, so latency matters more than raw bandwidth here.
 - What this buys over the earlier 8-GPU sizing is not speed but headroom: the
-  full-precision weights fit, KV cache stops being rationed, and long contexts
+  FP8 weights fit without squeezing, KV cache stops being rationed, and long contexts
   and concurrent sessions no longer trade against each other. An agentic client
   driving WEFT is exactly the workload that cares — long tool-call transcripts,
   several sessions at once.
