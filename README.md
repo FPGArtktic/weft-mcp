@@ -3,6 +3,7 @@
 # WEFT — WEFT Elaborates FPGA Toolchains
 
 [![ci](https://github.com/FPGArtktic/weft-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/FPGArtktic/weft-mcp/actions/workflows/ci.yml)
+[![container](https://github.com/FPGArtktic/weft-mcp/actions/workflows/container.yml/badge.svg)](https://github.com/FPGArtktic/weft-mcp/actions/workflows/container.yml)
 [![docs](https://readthedocs.org/projects/weft-mcp/badge/?version=latest)](https://weft-mcp.readthedocs.io/en/latest/)
 [![python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](pyproject.toml)
 [![latest tag](https://img.shields.io/github/v/tag/FPGArtktic/weft-mcp)](https://github.com/FPGArtktic/weft-mcp/tags)
@@ -648,9 +649,10 @@ generated tool and configuration references worth anything, since a key added
 without a description fails the build rather than shipping a reference that is
 quietly incomplete.
 
-The eighteen tests that need the `weft-tools` image are not in that run. They
-skip themselves when the image is absent, and building it compiles GHDL from
-source. A separate `container` workflow builds it for real and runs them where
+The eighteen tests that need the `weft-tools` image are not in that run — the
+second badge above is theirs. They skip themselves when the image is absent,
+and building it compiles GHDL from source, which measured at eight minutes on
+a runner. A separate `container` workflow builds it for real and runs them where
 a break would mean something: when the Containerfile or the code driving it
 changes, weekly because Arch is a rolling release, and on demand. It also
 asserts that the tests actually *ran* — a run where they all skipped would
