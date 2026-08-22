@@ -154,7 +154,11 @@ the first time.
 
 ## Configuring
 
-WEFT reads one TOML file, by default `~/.config/weft/weft.toml`:
+WEFT reads one TOML file, found at `--config`, then `$WEFT_CONFIG`, then
+`~/.config/weft/weft.toml`. Only `[workspace]` is required. Every key is
+documented in the [configuration reference](Documentation/), which is
+generated from the loader itself and fails the documentation build if a key
+is added without being described.
 
 ```toml
 [workspace]
@@ -296,8 +300,16 @@ That directory is mounted **read-only**, so indexing cannot write anything into
 your collection, and the index lands wherever `[rag] database` says. Point the
 database at a shared path and one library serves every project.
 
-`index_document` takes a PDF from there and makes it searchable. Pages with a text layer
-are extracted directly; only pages that come back empty — a scan — are rendered
+**Nothing is indexed on its own.** There is no watcher, no scan at startup, no
+background pass over the library — exactly as for source code, which
+`index_project` reads only when asked. `index_document` reads one document when
+you name it, and never before. `list_indexed_docs` shows what is indexed *and*
+what is sitting in the library un-indexed, because otherwise a model has no way
+to ask for a document whose filename it has never seen.
+
+`index_document` takes a PDF from the library and makes it searchable. Pages
+with a text layer are extracted directly; only pages that come back empty — a
+scan — are rendered
 and passed to Tesseract, so a born-digital 1300-page standard is indexed in
 seconds rather than an hour of pointless OCR.
 

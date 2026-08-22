@@ -41,6 +41,14 @@ DEFAULT_LOG_TAIL = 100
 #: Default number of search hits returned.
 DEFAULT_SEARCH_HITS = 20
 
+#: How many un-indexed library files to name. A library of hundreds is
+#: normal; a tool result that lists them all is not.
+MAX_LIBRARY_LISTING = 50
+
+#: What a document library holds. Only PDFs, because that is what
+#: index_document reads.
+LIBRARY_SUFFIXES = (".pdf",)
+
 #: Where generated documentation lands, relative to the project directory.
 DOC_DIR = "docs"
 
@@ -753,13 +761,53 @@ def build(config: Config) -> MCPServer:
         blocks = render.module_doc(found, symbols.dependents(found.name))
         return keep(blocks, format, directory, found.name, found.name)
 
-    @server.tool(description="The documents currently indexed for retrieval.")
+    @server.tool(
+        description=(
+            "What is indexed for retrieval, and what is sitting in the document "
+            "library waiting to be. Nothing is indexed on its own: index_document "
+            "reads one document when it is asked to, and never before."
+        )
+    )
     def list_indexed_docs() -> dict[str, Any]:
-        """list_indexed_docs - what has been read into the retrieval store."""
+        """list_indexed_docs - what is indexed, and what is available to index
+
+        Indexing is on demand, exactly as it is for source code: no watcher,
+        no scan at startup, nothing read until index_document names it. That
+        leaves a client with no way to know what is there, which is why the
+        library's own contents are listed here too -- a model cannot ask for a
+        document whose name it has never seen.
+
+        Return: the indexed documents, and the library files that are not.
+        """
         found = documents.documents()
-        return {"count": len(found), "documents": [asdict(d) for d in found]}
+        indexed = {d.path for d in found}
+        waiting = [p for p in _library_documents(config.rag_library) if p not in indexed]
+
+        return {
+            "count": len(found),
+            "documents": [asdict(d) for d in found],
+            "library": str(config.rag_library),
+            "not_indexed_count": len(waiting),
+            "not_indexed": sorted(waiting)[:MAX_LIBRARY_LISTING],
+        }
 
     return server
+
+
+def _library_documents(library: Path) -> list[str]:
+    """_library_documents - the documents the library holds, library-relative
+
+    A library that does not exist yet is empty rather than an error: the
+    section defaults to the workspace, and a workspace with no PDFs in it is
+    the ordinary case.
+    """
+    if not library.is_dir():
+        return []
+    return [
+        str(p.relative_to(library))
+        for p in library.rglob("*")
+        if p.suffix.lower() in LIBRARY_SUFFIXES and p.is_file()
+    ]
 
 
 def _output_dir(directory: Path, revision: str) -> Path | None:
