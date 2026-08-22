@@ -7,12 +7,18 @@ from weft.docgen.document import (
     HTML,
     MARKDOWN,
     Bullets,
-    Code,
+    Diagram,
     Heading,
     Paragraph,
     Table,
     render,
 )
+
+TREE = {
+    "module": "top",
+    "resolved": True,
+    "instances": [{"name": "u_leaf", "line": 1, "module": "leaf", "resolved": True}],
+}
 
 
 def test_a_heading_carries_its_level():
@@ -45,13 +51,37 @@ def test_html_escapes_what_would_otherwise_be_markup():
     assert "&lt;script&gt;" in got
 
 
-def test_a_mermaid_block_is_marked_so_a_viewer_can_draw_it():
-    got = render([Code("graph TD", language="mermaid")], HTML)
-    assert '<pre class="mermaid">' in got
+def test_a_diagram_is_mermaid_in_markdown():
+    """GitHub and the Markdown viewers draw a mermaid fence."""
+    got = render([Diagram(TREE)], MARKDOWN)
+    assert "```mermaid" in got
+    assert "graph TD" in got
 
 
-def test_a_plain_code_block_is_not_marked_as_a_diagram():
-    assert 'class="mermaid"' not in render([Code("x = 1", language="python")], HTML)
+def test_a_diagram_is_svg_in_html():
+    """A browser draws no mermaid, and an offline page cannot fetch a renderer."""
+    got = render([Diagram(TREE)], HTML)
+    assert "<svg" in got
+    assert "graph TD" not in got
+
+
+def test_the_svg_diagram_needs_nothing_to_display():
+    """The only URL in it is the SVG namespace, which is a name, not a fetch."""
+    got = render([Diagram(TREE)], HTML)
+    assert "<script" not in got
+    assert "src=" not in got
+    assert "href=" not in got
+
+
+def test_a_property_table_has_no_empty_header_strip():
+    """A header row of blank cells reads as a rendering fault."""
+    got = render([Table(["", ""], [["Device", "10M04"]])], HTML)
+    assert "<thead>" not in got
+    assert 'class="plain"' in got
+
+
+def test_a_titled_table_keeps_its_header():
+    assert "<thead>" in render([Table(["Signal", "Pin"], [["clk", "28"]])], HTML)
 
 
 def test_bullets_render_in_both_forms():

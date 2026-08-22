@@ -23,6 +23,9 @@ _HEADING = re.compile(r"^(?P<clause>\d+(?:\.\d+){0,5})\.?\s+(?P<title>\S.{2,90})
 #: "IEEE Std 1800-2017" in a running head gives the citation its designation.
 _DESIGNATION = re.compile(r"\b(?:IEEE|IEC|ISO)\s+Std\s+(?P<number>[\w.-]+)")
 
+#: A Markdown heading: one to six hashes, then the title.
+_MARKDOWN_HEADING = re.compile(r"^(?P<hashes>#{1,6})\s+(?P<title>\S.*)$")
+
 #: A line appearing on at least this share of pages is furniture, not content.
 RUNNING_SHARE = 0.5
 
@@ -218,3 +221,47 @@ def _split(text: str, max_chars: int, overlap: int) -> list[str]:
             break
         position = max(end - overlap, position + 1)
     return [p for p in parts if p]
+
+
+def markdown_chunks(
+    text: str,
+    max_chars: int = DEFAULT_MAX_CHARS,
+    overlap: int = DEFAULT_OVERLAP,
+) -> list[Chunk]:
+    """markdown_chunks - cut generated documentation at its headings
+
+    @text: the Markdown document
+    @max_chars / @overlap: as in chunks()
+
+    Generated documents have headings but no clause numbers, so a retrieved
+    piece cites its section rather than a clause. Everything else is the same
+    cut: a section shorter than @max_chars stays whole, because a port table
+    split down the middle answers nothing.
+
+    Return: the chunks, in document order.
+    """
+    pieces: list[Chunk] = []
+    heading: str | None = None
+    buffer: list[str] = []
+
+    def flush() -> None:
+        body = "\n".join(buffer).strip()
+        buffer.clear()
+        if not body:
+            return
+        for part in _split(body, max_chars, overlap):
+            pieces.append(
+                Chunk(text=part, page=1, clause=None, heading=heading, ordinal=len(pieces))
+            )
+
+    for line in text.splitlines():
+        found = _MARKDOWN_HEADING.match(line)
+        if found:
+            flush()
+            heading = found["title"].strip()
+            buffer.append(line)
+            continue
+        buffer.append(line)
+
+    flush()
+    return pieces

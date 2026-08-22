@@ -13,9 +13,8 @@ from typing import Any
 
 from ..index.model import Module
 from ..quartus.reports import Reports
-from . import mermaid
 from .constraints import Clock, Pin
-from .document import Block, Bullets, Code, Heading, Paragraph, Table
+from .document import Block, Bullets, Diagram, Heading, Paragraph, Table
 
 #: Said where a compilation would have supplied the numbers and has not run.
 NOT_COMPILED = "No compilation reports were found, so resources and timing are absent."
@@ -134,10 +133,7 @@ def _hierarchy(project: Project) -> list[Block]:
     """_hierarchy - the instance tree, drawn."""
     if project.top is None:
         return []
-    return [
-        Heading(2, "Hierarchy"),
-        Code(mermaid.hierarchy(project.top), language="mermaid"),
-    ]
+    return [Heading(2, "Hierarchy"), Diagram(project.top)]
 
 
 def _modules(project: Project) -> list[Block]:

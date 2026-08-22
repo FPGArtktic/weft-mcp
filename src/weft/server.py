@@ -18,6 +18,7 @@ from mcp.server.auth.provider import AccessToken
 
 from . import __version__
 from .config import STATE_DIR, Config, load
+from .docgen import constraints, document, render
 from .fastloop.lint import lint as run_lint
 from .fastloop.simulate import simulate as run_simulate
 from .index import indexer
@@ -38,6 +39,13 @@ DEFAULT_LOG_TAIL = 100
 
 #: Default number of search hits returned.
 DEFAULT_SEARCH_HITS = 20
+
+#: Where generated documentation lands, relative to the project directory.
+DOC_DIR = "docs"
+
+#: doc_type given to what WEFT writes itself, so a search can tell a
+#: generated reference from a standard the user supplied.
+GENERATED = "generated"
 
 #: Passages returned by a document search. Fewer than code hits, because each
 #: one is a paragraph rather than a line.
@@ -92,15 +100,20 @@ class Embeddings:
         self._embedder: Embedder | None = None
         self._failed: str | None = None
 
-    def encode(self, texts: list[str]) -> list[list[float]]:
-        """encode - vectors for @texts, or an empty list without a model
+    def encode(self, texts: list[str]) -> list[list[float]] | None:
+        """encode - vectors for @texts, or None when no model is configured
+
+        None rather than an empty list, because the two mean different things
+        to the store: None is "this document has no embeddings", while an
+        empty list for a document with chunks is an embedder that produced
+        nothing and must be reported rather than stored around.
 
         Raises EmbedError if a model is configured but cannot be loaded. A
         misconfigured model is a mistake to report, not one to work around by
         quietly falling back to a different kind of search.
         """
         if self._path is None:
-            return []
+            return None
         if self._failed is not None:
             raise EmbedError(self._failed)
         if self._embedder is None:
@@ -538,6 +551,121 @@ def build(config: Config) -> MCPServer:
             "passages": [asdict(p) for p in found],
         }
 
+    def keep(
+        blocks: list[document.Block], form: str, directory: Path, name: str, title: str
+    ) -> dict[str, Any]:
+        """keep - write a generated document and put it in the retrieval store
+
+        @blocks: the document
+        @form: the format to write, "markdown" or "html"
+        @directory: project directory receiving a docs/ subdirectory
+        @name: file stem
+        @title: page title
+
+        Generated documentation is indexed as it is written. A reference
+        nobody can find answers nothing, and the client that asked for it is
+        the same one that will later ask what a port does.
+
+        What is indexed is always the Markdown rendering, whatever was
+        written to disk: chunking HTML at Markdown headings finds none of
+        them, and would file a page of tags under no heading at all.
+
+        Return: the path, the size, and how the document was indexed.
+        """
+        text = document.render(blocks, form, title=title)
+        path = directory / DOC_DIR / f"{name}.{'html' if form == document.HTML else 'md'}"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)
+
+        relative = str(path.relative_to(config.workspace))
+        indexable = (
+            text
+            if form == document.MARKDOWN
+            else document.render(blocks, document.MARKDOWN, title=title)
+        )
+        pieces = chunk.markdown_chunks(indexable)
+        vectors = embedder.encode([c.text for c in pieces])
+        documents.add(relative, pieces, pages=1, doc_type=GENERATED, vectors=vectors)
+        return {
+            "path": relative,
+            "bytes": len(text),
+            "sections": len(pieces),
+            "indexed": True,
+            "retrieval": VECTOR if vectors else TEXT,
+        }
+
+    @server.tool(
+        description=(
+            "Generate a project reference: port and parameter tables from the AST, "
+            "a Mermaid hierarchy diagram, the pin map and clock constraints, and "
+            "resources and timing from the last compilation. Facts only -- no "
+            "descriptions are invented. The result is indexed for retrieval."
+        )
+    )
+    def generate_docs(
+        project_ref: str, format: str = document.MARKDOWN, top: str | None = None
+    ) -> dict[str, Any]:
+        """generate_docs - a reference document for one project
+
+        @project_ref: workspace-relative .qpf path, or the project name
+        @format: "markdown" or "html"
+        @top: top entity for the hierarchy diagram; taken from the .qsf when
+              not given
+
+        Sections whose facts are missing are left out rather than filled in:
+        a design that has never been fitted has no pin map, and saying so is
+        the accurate outcome.
+
+        Return: where the document was written, and how it was indexed.
+
+        Raises SandboxError if @project_ref escapes the workspace, ProjectError
+        if the .qsf cannot be read, ValueError for an unknown format.
+        """
+        directory, revision = located(project_ref)
+        info = project.project_info(directory, revision)
+
+        entity = top or info.get("top_entity")
+        built = render.Project(
+            name=revision,
+            info=info,
+            modules=symbols.modules(),
+            top=symbols.hierarchy(entity) if entity else None,
+            pins=constraints.pins(directory, revision, _output_dir(directory, revision)),
+            clocks=constraints.clocks(directory, revision),
+            reports=_reports_or_none(directory, revision),
+        )
+
+        return keep(render.project_doc(built), format, directory, revision, revision)
+
+    @server.tool(
+        description=(
+            "Generate one module's reference page from the index: ports, "
+            "parameters, instances, and the header its author wrote. Facts only."
+        )
+    )
+    def generate_module_doc(
+        module: str, project_ref: str | None = None, format: str = document.MARKDOWN
+    ) -> dict[str, Any]:
+        """generate_module_doc - a reference page for one module
+
+        @module: module or entity name, matched without regard to case
+        @project_ref: project whose docs directory receives the page; the
+                      workspace root is used when there is none
+        @format: "markdown" or "html"
+
+        Return: where the page was written, or a not-indexed marker.
+
+        Raises SandboxError if @project_ref escapes the workspace, ValueError
+        for an unknown format.
+        """
+        found = symbols.module(module)
+        if found is None:
+            return {"module": module, "indexed": False}
+
+        directory = located(project_ref)[0] if project_ref else config.workspace
+        blocks = render.module_doc(found, symbols.dependents(found.name))
+        return keep(blocks, format, directory, found.name, found.name)
+
     @server.tool(description="The documents currently indexed for retrieval.")
     def list_indexed_docs() -> dict[str, Any]:
         """list_indexed_docs - what has been read into the retrieval store."""
@@ -545,6 +673,28 @@ def build(config: Config) -> MCPServer:
         return {"count": len(found), "documents": [asdict(d) for d in found]}
 
     return server
+
+
+def _output_dir(directory: Path, revision: str) -> Path | None:
+    """_output_dir - where this project's reports are, when they exist."""
+    try:
+        found = reports.output_directory(directory, revision)
+    except reports.ReportError:
+        return None
+    return found if found.is_dir() else None
+
+
+def _reports_or_none(directory: Path, revision: str):
+    """_reports_or_none - parsed reports, or None when nothing was compiled.
+
+    A project that has never been through the flow is the normal case for a
+    design under development, not an error worth propagating into a document
+    generator.
+    """
+    try:
+        return reports.parse_reports(directory, revision)
+    except reports.ReportError:
+        return None
 
 
 class RequireToken:

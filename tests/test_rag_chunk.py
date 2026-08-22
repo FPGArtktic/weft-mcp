@@ -5,7 +5,7 @@ The pages here are written by hand rather than taken from a real standard: the
 corpus is copyrighted and stays out of the repository entirely.
 """
 
-from weft.rag.chunk import Chunk, chunks, designation, running_lines
+from weft.rag.chunk import Chunk, chunks, designation, markdown_chunks, running_lines
 from weft.rag.ingest import Page
 
 HEAD = "IEEE Std 1800-2017"
@@ -120,3 +120,36 @@ def test_chunks_are_ordered():
 
 def test_an_empty_document_yields_nothing():
     assert chunks([]) == []
+
+
+def test_markdown_is_cut_at_its_headings():
+    text = "# Title\n\nintro\n\n## Ports\n\n| a | b |\n\n## Clocks\n\nfifty megahertz\n"
+    pieces = markdown_chunks(text)
+    assert [c.heading for c in pieces] == ["Title", "Ports", "Clocks"]
+
+
+def test_a_generated_chunk_carries_no_clause():
+    """Generated documents have sections, not numbered clauses."""
+    pieces = markdown_chunks("# Title\n\nbody\n")
+    assert pieces[0].clause is None
+
+
+def test_a_markdown_section_shorter_than_the_limit_stays_whole():
+    text = "## Ports\n\n| clk | in |\n| rst_n | in |\n"
+    assert len(markdown_chunks(text)) == 1
+
+
+def test_a_long_markdown_section_is_split():
+    text = "## Ports\n\n" + "\n".join(f"| sig{i} | in |" for i in range(400))
+    assert len(markdown_chunks(text, max_chars=500)) > 1
+
+
+def test_ordinals_run_from_zero_without_gaps():
+    """The store indexes vectors by ordinal, so they must be positions."""
+    pieces = markdown_chunks("# A\n\nx\n\n# B\n\ny\n\n# C\n\nz\n")
+    assert [c.ordinal for c in pieces] == list(range(len(pieces)))
+
+
+def test_text_that_is_not_a_heading_is_not_one():
+    pieces = markdown_chunks("# Title\n\na line with a # inside it\n")
+    assert len(pieces) == 1

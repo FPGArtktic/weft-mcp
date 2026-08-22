@@ -146,3 +146,14 @@ def test_the_store_works_from_another_thread(store):
     thread.start()
     thread.join()
     assert seen["hits"] == 1
+
+
+def test_a_document_with_headings_and_no_clauses_cites_its_heading(store):
+    """A generated document has sections; "p. 1" would name nothing."""
+    store.add(
+        "docs/counter.md",
+        [Chunk(text="pin map table", page=1, clause=None, heading="Pin map", ordinal=0)],
+        pages=1,
+        doc_type="generated",
+    )
+    assert store.search_text("pin map")[0].citation == "counter.md — Pin map"

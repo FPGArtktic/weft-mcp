@@ -318,6 +318,11 @@ def _passage(row: sqlite3.Row, score: float | None = None) -> Passage:
         citation = f"{designation} §{row['clause']}"
     elif row["clause"]:
         citation = f"§{row['clause']}"
+    elif row["heading"]:
+        # A generated document has headings and no pages worth naming. The
+        # PDF chunker only ever records a heading together with its clause,
+        # so this branch belongs to generated documentation alone.
+        citation = f"{Path(row['document']).name} — {row['heading']}"
     else:
         citation = f"{Path(row['document']).name} p. {row['page']}"
 

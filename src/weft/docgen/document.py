@@ -8,6 +8,9 @@ is less code and cannot drift: a table that gains a column gains it in both.
 
 import html as escaping
 from dataclasses import dataclass, field
+from typing import Any
+
+from . import diagram, mermaid
 
 #: Wrapper for the whole HTML document. No stylesheet is fetched and no script
 #: runs: an offline server must not emit a page that needs the network to be
@@ -26,8 +29,8 @@ table {{ border-collapse: collapse; margin: 1rem 0; display: block;
          overflow-x: auto; }}
 th, td {{ border: 1px solid #999; padding: 0.3rem 0.6rem; text-align: left; }}
 th {{ background: #f0f0f0; }}
-code, pre {{ font-family: ui-monospace, monospace; }}
-pre {{ background: #f6f6f6; padding: 0.8rem; overflow-x: auto; }}
+table.plain td:first-child {{ background: #f6f6f6; font-weight: 600; }}
+code {{ font-family: ui-monospace, monospace; }}
 </style>
 </head>
 <body>
@@ -54,18 +57,34 @@ class Paragraph:
 
 @dataclass(frozen=True)
 class Table:
-    """A table. @rows are already strings; empty cells are written as "-"."""
+    """A table.
+
+    @headers: column titles; empty strings for a table that is a list of
+              properties rather than a grid, where a header row would be a
+              blank strip above the data
+    @rows: already strings; an empty cell is written as "-"
+    """
 
     headers: list[str]
     rows: list[list[str]] = field(default_factory=list)
 
+    @property
+    def titled(self) -> bool:
+        """titled - whether any column actually has a name."""
+        return any(h.strip() for h in self.headers)
+
 
 @dataclass(frozen=True)
-class Code:
-    """A fenced block. @language "mermaid" is what makes a diagram render."""
+class Diagram:
+    """An instance hierarchy, drawn in whichever way the format can show.
 
-    text: str
-    language: str = ""
+    The same tree twice: Mermaid text in Markdown, where GitHub and the
+    Markdown viewers draw it, and SVG in HTML, where nothing would. A page
+    that prints the source of a diagram instead of the diagram is not
+    documentation, and an offline server cannot fetch a renderer to fix it.
+    """
+
+    tree: dict[str, Any]
 
 
 @dataclass(frozen=True)
@@ -75,7 +94,7 @@ class Bullets:
     items: list[str]
 
 
-Block = Heading | Paragraph | Table | Code | Bullets
+Block = Heading | Paragraph | Table | Bullets | Diagram
 
 MARKDOWN = "markdown"
 HTML = "html"
@@ -106,11 +125,13 @@ def _markdown(block: Block) -> str:
         return f"{'#' * block.level} {block.text}"
     if isinstance(block, Paragraph):
         return block.text
-    if isinstance(block, Code):
-        return f"```{block.language}\n{block.text}\n```"
+    if isinstance(block, Diagram):
+        return f"```mermaid\n{mermaid.hierarchy(block.tree)}\n```"
     if isinstance(block, Bullets):
         return "\n".join(f"- {item}" for item in block.items)
 
+    # Markdown has no headerless table, so an untitled one keeps the rule
+    # and an empty head; the rule is what makes it a table at all.
     head = "| " + " | ".join(block.headers) + " |"
     rule = "|" + "|".join("---" for _ in block.headers) + "|"
     body = ["| " + " | ".join(_cell(c) for c in row) + " |" for row in block.rows]
@@ -125,20 +146,21 @@ def _html(block: Block) -> str:
         return f"<h{level}>{e(block.text)}</h{level}>"
     if isinstance(block, Paragraph):
         return f"<p>{e(block.text)}</p>"
-    if isinstance(block, Code):
-        # A mermaid block is marked rather than escaped into a plain listing:
-        # a viewer that draws diagrams draws it, and one that does not shows
-        # the source, which is still the hierarchy in readable form.
-        cls = ' class="mermaid"' if block.language == "mermaid" else ""
-        return f"<pre{cls}>{e(block.text)}</pre>"
+    if isinstance(block, Diagram):
+        return diagram.hierarchy(block.tree)
     if isinstance(block, Bullets):
         items = "".join(f"<li>{e(i)}</li>" for i in block.items)
         return f"<ul>{items}</ul>"
 
-    head = "".join(f"<th>{e(h)}</th>" for h in block.headers)
     rows = "".join(
         "<tr>" + "".join(f"<td>{e(_cell(c))}</td>" for c in row) + "</tr>" for row in block.rows
     )
+    if not block.titled:
+        # A header row of empty cells draws a grey strip over nothing, which
+        # reads as a rendering fault rather than as a table of properties.
+        return f'<table class="plain"><tbody>{rows}</tbody></table>'
+
+    head = "".join(f"<th>{e(h)}</th>" for h in block.headers)
     return f"<table><thead><tr>{head}</tr></thead><tbody>{rows}</tbody></table>"
 
 
