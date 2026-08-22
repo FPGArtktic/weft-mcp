@@ -11,6 +11,67 @@ the summary you can read in a minute.
 
 [semver]: https://semver.org/spec/v2.0.0.html
 
+## [0.5.0] — 2026-08-22
+
+Milestone 5 — documentation generated from facts.
+
+### Added
+
+- `docs`: `generate_docs` and `generate_module_doc`, in Markdown and HTML.
+  Port and parameter tables come from the syntax trees, the pin map from the
+  fitter's `.pin` report, resources and timing from the compilation reports.
+  Nothing is described that was not computed: an undocumented port gets a dash
+  rather than a sentence about what the generator imagines it does. Prose stays
+  the client model's job, so a reader can tell which lines were derived.
+- `docs`: the instance hierarchy, drawn twice from one tree. Mermaid in
+  Markdown, where GitHub and the Markdown viewers render it; inline SVG in
+  HTML, where nothing would — a browser draws no Mermaid and an offline server
+  cannot hand it a renderer, so an HTML page carrying Mermaid source would show
+  the source. One node per instance path, so a module instantiated twice is two
+  boxes; a module that is instantiated but not indexed is drawn dashed rather
+  than dropped.
+- `index`: the kernel-doc header a module carries above itself. PROJECT.md's
+  HDL header convention always said the indexer consumes these, and it did not:
+  a module's summary and its per-port descriptions sat in the source where
+  nothing could reach them. The block is found by the name it announces rather
+  than by adjacency, because a `timescale sits between it and the declaration
+  in SystemVerilog and a library clause does in VHDL. `get_module_info` returns
+  them too.
+- `docs`: pin assignments and clock constraints. The fitter's report wins over
+  the .qsf where both exist — the .qsf says what was asked for, the report says
+  where the signal went. Constraint files are read only where the project
+  declares them; a .sdc no SDC_FILE assignment names never reaches Quartus, and
+  documenting a constraint the tool never saw would describe a design that does
+  not exist.
+- `rag`: generated documents are indexed as they are written, cut at their
+  Markdown headings and cited by section. HTML output is indexed from its
+  Markdown rendering, since chunking a page of tags at Markdown headings finds
+  none of them.
+- `examples`: the demonstration project's generated reference is committed.
+  What the tool produces is easier to judge than to describe, and the figures
+  in it are real — 177 logic elements and 154.23 MHz from a Quartus 25.1
+  compilation of that project.
+
+### Changed
+
+- The document library is its own configured root, `[rag] library`, mounted
+  read-only and separate from the workspace. A collection of standards outlives
+  any one project and does not belong inside it; the index (`[rag] database`)
+  can sit outside the workspace too, so one library serves every project.
+
+### Fixed
+
+- `[rag] database` was parsed, validated and documented, and then ignored: the
+  document store used a path spelled out in the server. A known configuration
+  key that silently does nothing is worse than an unknown one, which is
+  refused at startup.
+- The version was declared in both pyproject and the module, and they had
+  drifted: 0.4.0 announced itself as 0.3.0 over MCP. The package now reads it
+  from the module.
+- Indexing a document with no embedding model configured raised "0 vectors for
+  N chunks" instead of storing the text. The embedder now returns nothing at
+  all rather than an empty batch, which the store correctly refuses.
+
 ## [0.4.0] — 2026-08-22
 
 Milestone 4 — document retrieval with OCR.
@@ -142,6 +203,7 @@ Milestone 1 — the fast loop.
 - `Documentation`: the counter demonstration project, written in
   SystemVerilog, Verilog-2001 and VHDL at once.
 
+[0.5.0]: https://github.com/FPGArtktic/weft-mcp/releases/tag/v0.5.0
 [0.4.0]: https://github.com/FPGArtktic/weft-mcp/releases/tag/v0.4.0
 [0.3.0]: https://github.com/FPGArtktic/weft-mcp/releases/tag/v0.3.0
 [0.2.0]: https://github.com/FPGArtktic/weft-mcp/releases/tag/v0.2.0

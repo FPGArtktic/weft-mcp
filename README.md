@@ -23,7 +23,7 @@ WEFT is under construction, milestone by milestone. What is finished today:
 | `parse_reports` | working — resources, timing per clock, ranked messages |
 | Source indexing | working — `index_project`, `get_module_info`, `get_hierarchy`, `search_code` |
 | Document RAG with OCR | working — `index_document`, `search_docs`, `list_indexed_docs`; clause-level citations |
-| Documentation generation | not yet |
+| Documentation generation | working — `generate_docs`, `generate_module_doc`; Markdown and HTML, auto-indexed |
 | Device programming | not yet |
 
 Both transports work: stdio for a local client, Streamable HTTP behind a
@@ -283,6 +283,30 @@ holds the weights and is the 2 GB.
 
 Documents are yours and stay yours. WEFT ships no standards, no handbooks and
 no vendor documentation, and the index it builds never leaves your workspace.
+
+## Generated documentation
+
+`generate_docs` writes a reference for a project and `generate_module_doc` for
+a single module. Everything in them was computed by something: port and
+parameter tables from the Verible and GHDL syntax trees, per-port descriptions
+from the kernel-doc headers in your sources, the pin map from the fitter's own
+`.pin` report, the resource and timing figures from the compilation reports.
+
+What it does **not** do is describe what your module is for. A generator that
+invents a sentence about a port produces a document that reads like a reference
+and is not one, and you cannot tell which lines were computed and which were
+guessed. An undocumented port gets a dash. Prose is the client model's job —
+it can read the same facts and write them up, and then you know who said what.
+
+[`examples/counter/docs/counter.md`](examples/counter/docs/counter.md) is
+committed output, not a mock-up: 177 logic elements and 154.23 MHz from a real
+compilation, and GitHub draws the hierarchy diagram.
+
+Markdown gets the hierarchy as Mermaid, which GitHub and most Markdown viewers
+render. HTML gets the same tree as inline SVG instead: a browser draws no
+Mermaid, and a server that makes no network calls cannot hand it a renderer, so
+an HTML page carrying Mermaid source would show the source. Generated documents
+are indexed for retrieval as they are written, under `doc_type: "generated"`.
 
 ## The demo project
 
