@@ -15,6 +15,27 @@ the summary you can read in a minute.
 
 ### Added
 
+- `fastloop`: `lint(..., linter="questa")` checks a mixed-language design with
+  the vendor's own front-end. Linting the demonstration project with Verilator
+  reports `MODMISSING` for `seven_seg_decoder` — the module is not missing, it
+  is VHDL — so the fast loop's headline diagnostic on that project was false.
+  Questa returns nothing, because it resolves the entity. It is a compile check
+  rather than a style linter: full lint is a licensed feature the Starter
+  Edition does not carry.
+- `fastloop`: sources in the language not being checked are left out rather
+  than handed to a tool that cannot read them, and are named in the result. A
+  mixed set with nothing to resolve it by is refused instead of being quietly
+  given to whichever tool the language argument named.
+- `docs`: `generate_compilation_doc` — a build summary that opens with whether
+  it built, whether timing closed, and what needs attention, and keeps errors
+  and critical warnings apart from the routine ones Quartus prints every time.
+  Errors and critical warnings are counted separately: a build with two
+  critical warnings and no errors succeeded, and calling that "2 errors" is
+  false. Each slack names its check, because the smallest number is usually
+  hold and a bare figure reads as setup.
+- `rag`: `list_indexed_docs` also names what the library holds and has not
+  indexed. Nothing is ever indexed automatically, and a model cannot ask for a
+  document whose filename it has never seen.
 - `fastloop`: `simulate(..., simulator="questa")` runs the host Questa - Altera
   Starter FPGA Edition. It reads Verilog, SystemVerilog and VHDL in one
   simulation, which no open simulator does, so a mixed-language hierarchy runs
