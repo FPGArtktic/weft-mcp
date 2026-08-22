@@ -100,7 +100,7 @@ def test_simulator_must_match_the_language(image, tmp_path, canned):
 def test_unknown_simulator_is_refused(image, tmp_path, canned):
     canned()
     with pytest.raises(SimulationError, match="unknown simulator"):
-        simulate(image, tmp_path, ["a.sv"], top="tb", simulator="questa")
+        simulate(image, tmp_path, ["a.sv"], top="tb", simulator="vcs")
 
 
 def test_unrecognised_suffix_is_refused(image, tmp_path, canned):
@@ -190,3 +190,91 @@ def test_real_verilator_run_passes(image, tmp_path):
     got = simulate(image, tmp_path, ["tb.sv"], top="tb", timeout=400)
     assert got.passed, got.log
     assert "hello from verilator" in got.log
+
+
+@pytest.fixture
+def questa(monkeypatch):
+    """questa - answer the host simulator with a fixed transcript."""
+
+    def install(output="", returncode=0):
+        seen = {}
+
+        def fake_run(inst, directory, verilog, vhdl, top, waveform=None, timeout=None):
+            seen.update(
+                verilog=[p.name for p in verilog],
+                vhdl=[p.name for p in vhdl],
+                top=top,
+                waveform=waveform,
+            )
+            return podman.Result(returncode, output)
+
+        monkeypatch.setattr(simmod.questa, "run", fake_run)
+        return seen
+
+    return install
+
+
+def probed(tmp_path):
+    return simmod.questa.Install(root=tmp_path, version="Questa 2025.2", env={})
+
+
+def test_questa_simulates_a_mixed_set_whole(image, tmp_path, questa):
+    """The one thing no open simulator can do, and the reason it is here."""
+    seen = questa()
+    got = simulate(
+        image,
+        tmp_path,
+        ["top.sv", "helper.v", "decoder.vhd"],
+        top="tb",
+        testbench="tb.sv",
+        simulator="questa",
+        install=probed(tmp_path),
+    )
+    assert got.excluded == []
+    assert seen["verilog"] == ["top.sv", "helper.v", "tb.sv"]
+    assert seen["vhdl"] == ["decoder.vhd"]
+
+
+def test_questa_is_never_chosen_by_itself(image, tmp_path, canned):
+    """It is proprietary and licensed; it has to be asked for by name."""
+    canned()
+    got = simulate(image, tmp_path, ["a.sv"], top="tb")
+    assert got.simulator != "questa"
+
+
+def test_questa_without_a_configured_install_says_so(image, tmp_path, canned):
+    canned()
+    with pytest.raises(SimulationError, match="no Questa configured"):
+        simulate(image, tmp_path, ["a.sv"], top="tb", simulator="questa")
+
+
+def test_a_questa_warning_is_not_a_failure(image, tmp_path, questa):
+    """Questa warns about what a working design does routinely."""
+    questa(returncode=1)
+    got = simulate(
+        image, tmp_path, ["a.sv"], top="tb", simulator="questa", install=probed(tmp_path)
+    )
+    assert got.passed is True
+
+
+def test_a_questa_error_is_a_failure(image, tmp_path, questa):
+    questa(returncode=2)
+    got = simulate(
+        image, tmp_path, ["a.sv"], top="tb", simulator="questa", install=probed(tmp_path)
+    )
+    assert got.passed is False
+    assert got.returncode == 2
+
+
+def test_a_named_simulator_narrows_a_mixed_set_without_a_testbench(image, tmp_path, canned):
+    """Naming the simulator answers the question a testbench would have."""
+    canned()
+    got = simulate(image, tmp_path, ["a.sv", "b.vhd"], top="tb", simulator="ghdl")
+    assert got.simulator == "ghdl"
+    assert got.excluded == ["a.sv"]
+
+
+def test_a_simulator_that_reads_none_of_the_sources_is_refused(image, tmp_path, canned):
+    canned()
+    with pytest.raises(SimulationError, match="does not read"):
+        simulate(image, tmp_path, ["a.vhd"], top="tb", simulator="verilator")

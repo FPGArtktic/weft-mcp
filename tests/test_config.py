@@ -73,6 +73,33 @@ def test_the_document_library_can_live_outside_the_workspace(tmp_path):
     assert cfg.rag_library == library
 
 
+def test_no_questa_section_means_no_questa(tmp_path):
+    assert load(write(tmp_path, '[workspace]\nroot = "@WS@"\n')).questa is None
+
+
+def test_a_questa_root_must_hold_vsim(tmp_path):
+    fake = tmp_path / "questa_fse"
+    (fake / "bin").mkdir(parents=True)
+    with pytest.raises(ConfigError, match="holds no bin/vsim"):
+        load(write(tmp_path, f'[workspace]\nroot = "@WS@"\n[questa]\nroot = "{fake}"\n'))
+
+
+def test_the_questa_licence_variable_is_carried_through(tmp_path):
+    """Questa reads its licence from an environment variable a daemon lacks."""
+    fake = tmp_path / "questa_fse"
+    (fake / "bin").mkdir(parents=True)
+    (fake / "bin" / "vsim").write_text("#!/bin/sh\n")
+    cfg = load(
+        write(
+            tmp_path,
+            f'[workspace]\nroot = "@WS@"\n[questa]\nroot = "{fake}"\n'
+            'env = { SALT_LICENSE_SERVER = ";/home/you/questa_lic.dat" }\n',
+        )
+    )
+    assert cfg.questa.root == fake
+    assert cfg.questa.env == {"SALT_LICENSE_SERVER": ";/home/you/questa_lic.dat"}
+
+
 def test_missing_workspace_section(tmp_path):
     with pytest.raises(ConfigError, match="missing \\[workspace\\]"):
         load(write(tmp_path, '[container]\nimage = "x"\n'))

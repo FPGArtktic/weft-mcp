@@ -19,6 +19,7 @@ from mcp.server.auth.provider import AccessToken
 from . import __version__
 from .config import STATE_DIR, Config, load
 from .docgen import constraints, document, render
+from .fastloop import questa
 from .fastloop.lint import lint as run_lint
 from .fastloop.simulate import simulate as run_simulate
 from .index import indexer
@@ -84,6 +85,34 @@ class Installs:
                 raise InstallError(f"no [quartus.{name}] section in the configuration")
             self._known[name] = probe(entry.root, entry.env)
         return self._known[name]
+
+
+class Questas:
+    """The Questa installation named in the configuration, probed on first use.
+
+    Probing runs vsim -version, which takes a moment and needs the licence, so
+    it happens when something asks to simulate in Questa rather than at
+    startup. A machine with no Questa configured gets None and the
+    containerised simulators.
+    """
+
+    def __init__(self, config: Config):
+        self._configured = config.questa
+        self._install: questa.Install | None = None
+
+    def get(self) -> questa.Install | None:
+        """get - the probed installation, or None when none is configured
+
+        Raises QuestaError if one is configured but will not answer, which is
+        what an unlicensed installation does. Reporting that beats falling
+        back to a different simulator and returning a result about a different
+        design.
+        """
+        if self._configured is None:
+            return None
+        if self._install is None:
+            self._install = questa.probe(self._configured.root, self._configured.env)
+        return self._install
 
 
 class Embeddings:
@@ -154,6 +183,8 @@ def build(config: Config) -> MCPServer:
 
     Return: an MCPServer with every tool of the current milestone registered.
     """
+    questas = Questas(config)
+
     server = MCPServer(
         name="weft",
         version=__version__,
@@ -205,7 +236,10 @@ def build(config: Config) -> MCPServer:
         @files: design sources, workspace-relative
         @top: unit to elaborate and run, normally the testbench
         @testbench: testbench source, if not already in @files
-        @simulator: "verilator", "icarus" or "ghdl"; defaults by language
+        @simulator: "verilator", "icarus", "ghdl" or "questa"; defaults by
+                    language. Questa runs on the host and reads all three
+                    languages at once, so it simulates a mixed design whole;
+                    it is never a default and needs a [questa] section.
 
         Return: pass or fail, the tail of the log, any waveform written, and
         the sources excluded as belonging to the other language.
@@ -218,6 +252,7 @@ def build(config: Config) -> MCPServer:
             testbench=testbench,
             simulator=simulator,
             timeout=config.job_timeout_s,
+            install=questas.get(),
         )
         return asdict(result)
 

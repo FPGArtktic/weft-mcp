@@ -1,19 +1,27 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""Behavioural simulation inside weft-tools.
+"""Behavioural simulation.
 
 The simulator follows from the sources' language: GHDL for VHDL, Verilator or
 Icarus for Verilog and SystemVerilog. None of the three reads more than one
-language, so a mixed-language source set is refused with an explanation rather
-than handed to a tool that will fail obscurely.
+language, so a mixed-language source set is narrowed to the testbench's
+language, or refused when there is no testbench to narrow by.
+
+Questa is the exception, and the reason it is here: it reads all three in one
+simulation, so a mixed-language hierarchy runs whole rather than a module at a
+time. It is proprietary and licensed and runs on the host, so it is never the
+default -- a caller asks for it by name, and the configuration must say where
+it is.
 """
 
 import shlex
+import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
 
 from .. import podman
 from ..sandbox import container_path, resolve
+from . import questa
 
 VERILOG = "verilog"
 VHDL = "vhdl"
@@ -21,6 +29,7 @@ VHDL = "vhdl"
 VERILATOR = "verilator"
 ICARUS = "icarus"
 GHDL = "ghdl"
+QUESTA = "questa"
 
 SUFFIX_LANGUAGE = {
     ".v": VERILOG,
@@ -36,6 +45,11 @@ SUFFIX_LANGUAGE = {
 DEFAULT_SIMULATOR = {VERILOG: VERILATOR, VHDL: GHDL}
 
 SIMULATOR_LANGUAGE = {VERILATOR: VERILOG, ICARUS: VERILOG, GHDL: VHDL}
+
+#: Simulators that read both languages in one run, and so exclude nothing.
+BILINGUAL = {QUESTA}
+
+SIMULATORS = sorted(SIMULATOR_LANGUAGE | dict.fromkeys(BILINGUAL))
 
 #: Build products stay out of the workspace; only waveforms go back.
 BUILD_DIR = "/tmp/weft-build"
@@ -84,6 +98,7 @@ def simulate(
     simulator: str | None = None,
     timeout: float | None = None,
     log_lines: int = DEFAULT_LOG_LINES,
+    install: "questa.Install | None" = None,
 ) -> Simulation:
     """simulate - build and run a testbench
 
@@ -93,10 +108,12 @@ def simulate(
     @top: unit to elaborate and run, normally the testbench module or entity
     @testbench: testbench source, appended to @files; may be None when @files
                 already contains it
-    @simulator: "verilator", "icarus" or "ghdl"; defaults to the one that fits
-                the sources' language
+    @simulator: "verilator", "icarus", "ghdl" or "questa"; defaults to the
+                one that fits the sources' language. Questa is never a default
+                -- it is proprietary and licensed, and must be asked for.
     @timeout: wall-clock limit in seconds
     @log_lines: how many trailing output lines to return
+    @install: the probed Questa installation, needed only for that simulator
 
     Pass or fail comes from the exit status, which is the only signal every
     simulator agrees on. A testbench that reports its verdict by printing and
@@ -118,18 +135,21 @@ def simulate(
     if not sources:
         raise SimulationError("no sources to simulate")
 
-    language, kept, excluded = _select(sources, testbench)
-    tool = _tool(simulator, language)
-
-    paths = [str(container_path(workspace, s)) for s in kept]
+    tool, kept, excluded = _plan(sources, testbench, simulator)
     waves = _wave_dir(workspace)
     started = time.time()
 
-    script = _script(tool, top, paths, container_path(workspace, waves))
-    result = podman.run(image, workspace, ["sh", "-c", script], timeout=timeout)
+    if tool == QUESTA:
+        result = _questa(install, workspace, kept, top, waves, timeout)
+        held = questa.passed(result.returncode)
+    else:
+        paths = [str(container_path(workspace, s)) for s in kept]
+        script = _script(tool, top, paths, container_path(workspace, waves))
+        result = podman.run(image, workspace, ["sh", "-c", script], timeout=timeout)
+        held = result.returncode == 0
 
     return Simulation(
-        passed=result.returncode == 0,
+        passed=held,
         returncode=result.returncode,
         simulator=tool,
         log=_tail(result.output, log_lines),
@@ -138,63 +158,115 @@ def simulate(
     )
 
 
-def _select(sources: list[str], testbench: str | None) -> tuple[str, list[str], list[str]]:
-    """_select - decide which language runs and which sources take part
+def _questa(
+    install: "questa.Install | None",
+    workspace: Path,
+    sources: list[str],
+    top: str,
+    waves: Path,
+    timeout: float | None,
+) -> podman.Result:
+    """_questa - run the host simulator over resolved host paths
+
+    The work library is built in a temporary directory and thrown away. It
+    costs a recompile every run, which for a fast loop is a second, and it
+    removes the whole class of failure where a stale library from an earlier
+    source tree is elaborated instead of the sources just given.
+
+    Raises SimulationError when no Questa is configured.
+    """
+    if install is None:
+        raise SimulationError(
+            "no Questa configured; add a [questa] section naming its root, or "
+            "use one of the containerised simulators"
+        )
+
+    verilog, vhdl = [], []
+    for source in sources:
+        target = vhdl if SUFFIX_LANGUAGE[Path(source).suffix.lower()] == VHDL else verilog
+        target.append(resolve(workspace, source))
+
+    with tempfile.TemporaryDirectory(prefix="weft-questa-") as scratch:
+        return questa.run(
+            install,
+            Path(scratch),
+            verilog,
+            vhdl,
+            top,
+            waveform=resolve(workspace, waves) / f"{top}.vcd",
+            timeout=timeout,
+        )
+
+
+def _plan(
+    sources: list[str], testbench: str | None, simulator: str | None
+) -> tuple[str, list[str], list[str]]:
+    """_plan - decide what runs, in which simulator, over which sources
 
     @sources: every file the caller offered, testbench included
     @testbench: the testbench source, or None
+    @simulator: the simulator asked for by name, or None to infer one
 
-    No open simulator reads Verilog and VHDL in one run, so at most one
-    language can take part. When the set spans both and a testbench names one
-    of them, that language wins and the rest is set aside: pointing a whole
-    mixed project at one testbench is how a single module gets simulated.
-    Without a testbench there is nothing to decide by, and guessing would
-    silently simulate the wrong half.
+    Whether a source set has to be narrowed is a property of the simulator,
+    not of simulation. Verilator, Icarus and GHDL each read one language, so a
+    set spanning both must lose half; Questa reads both, so it loses nothing
+    and the hierarchy runs whole. Deciding the tool first and the sources
+    afterwards is what lets the same function say both.
 
-    Return: the language, the sources to hand the simulator, and the sources
-    left out.
+    Where the tool is inferred, the language decides it, and a mixed set needs
+    a testbench to say which half is meant. Guessing would silently simulate
+    the wrong one.
 
-    Raises SimulationError for an unrecognised suffix, or for a set spanning
-    both languages with no testbench.
+    Return: the simulator, the sources to hand it, and the sources left out.
+
+    Raises SimulationError for an unrecognised suffix, an unknown simulator,
+    a simulator that cannot read any of the sources, or a mixed set with
+    neither a testbench nor a simulator to resolve it.
     """
-    found = {}
+    found: dict[str, list[str]] = {}
     for s in sources:
-        suffix = Path(s).suffix.lower()
-        language = SUFFIX_LANGUAGE.get(suffix)
+        language = SUFFIX_LANGUAGE.get(Path(s).suffix.lower())
         if language is None:
             raise SimulationError(f"unrecognised source type: {s}")
         found.setdefault(language, []).append(s)
 
+    if simulator is not None:
+        return _named(simulator.lower(), found, sources)
+
     if len(found) == 1:
         language, kept = next(iter(found.items()))
-        return language, kept, []
+        return DEFAULT_SIMULATOR[language], kept, []
 
-    listing = "; ".join(f"{lang}: {', '.join(fs)}" for lang, fs in sorted(found.items()))
     if testbench is None:
+        listing = "; ".join(f"{lang}: {', '.join(fs)}" for lang, fs in sorted(found.items()))
         raise SimulationError(
-            f"source set spans both languages ({listing}). No open simulator reads "
-            "both Verilog and VHDL in one run; name a testbench to pick the "
-            "language to simulate"
+            f"source set spans both languages ({listing}). Of the containerised "
+            "simulators none reads both in one run; name a testbench to pick the "
+            "language, or name questa to simulate the design whole"
         )
 
     language = SUFFIX_LANGUAGE[Path(testbench).suffix.lower()]
-    excluded = [s for lang, fs in sorted(found.items()) if lang != language for s in fs]
-    return language, found[language], excluded
+    return DEFAULT_SIMULATOR[language], found[language], _others(found, language)
 
 
-def _tool(simulator: str | None, language: str) -> str:
-    """_tool - pick the simulator, or check the one the caller asked for."""
-    if simulator is None:
-        return DEFAULT_SIMULATOR[language]
+def _named(
+    tool: str, found: dict[str, list[str]], sources: list[str]
+) -> tuple[str, list[str], list[str]]:
+    """_named - honour the simulator the caller asked for by name."""
+    if tool in BILINGUAL:
+        return tool, sources, []
 
-    wanted = SIMULATOR_LANGUAGE.get(simulator.lower())
-    if wanted is None:
-        raise SimulationError(
-            f"unknown simulator: {simulator}; expected one of {sorted(SIMULATOR_LANGUAGE)}"
-        )
-    if wanted != language:
-        raise SimulationError(f"{simulator} does not read {language} sources")
-    return simulator.lower()
+    language = SIMULATOR_LANGUAGE.get(tool)
+    if language is None:
+        raise SimulationError(f"unknown simulator: {tool}; expected one of {SIMULATORS}")
+    if language not in found:
+        raise SimulationError(f"{tool} does not read {'/'.join(sorted(found))} sources")
+    return tool, found[language], _others(found, language)
+
+
+def _others(found: dict[str, list[str]], language: str) -> list[str]:
+    """_others - the sources in the language that is not being simulated."""
+    return [s for lang, fs in sorted(found.items()) if lang != language for s in fs]
 
 
 def _script(tool: str, top: str, paths: list[str], waves: Path) -> str:

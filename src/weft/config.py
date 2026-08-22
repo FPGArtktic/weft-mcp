@@ -36,6 +36,20 @@ class Quartus:
 
 
 @dataclass(frozen=True)
+class Questa:
+    """The Questa installation that ships beside Quartus.
+
+    @root: install root, the directory holding bin/vsim
+    @env: extra environment for every invocation. Questa - Altera Starter FPGA
+          Edition reads its licence from SALT_LICENSE_SERVER, which is not in
+          the environment of a server started from a desktop session.
+    """
+
+    root: Path
+    env: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class Http:
     """Streamable HTTP transport settings.
 
@@ -55,6 +69,7 @@ class Config:
     @image: name of the locally built weft-tools image
     @quartus: installations by edition name, empty when no Quartus is set up
     @edition: edition used when a tool does not name one
+    @questa: the host Questa installation, or None when none is configured
     @jobs_db: SQLite file holding job state across restarts
     @job_timeout_s: wall-clock limit for a single compilation
     @rag_db: sqlite-vec store for indexed documents
@@ -69,6 +84,7 @@ class Config:
     image: str
     quartus: dict[str, Quartus]
     edition: str | None
+    questa: Questa | None
     jobs_db: Path
     job_timeout_s: int
     rag_db: Path
@@ -96,7 +112,11 @@ def load(path: str | Path) -> Config:
     except tomllib.TOMLDecodeError as e:
         raise ConfigError(f"malformed configuration: {e}") from e
 
-    _reject_unknown(raw, {"workspace", "container", "quartus", "jobs", "rag", "http"}, "top level")
+    _reject_unknown(
+        raw,
+        {"workspace", "container", "quartus", "questa", "jobs", "rag", "http"},
+        "top level",
+    )
 
     _reject_unknown(_table(raw, "workspace"), {"root"}, "workspace")
     workspace = _directory(_require(raw, "workspace", "root"), "workspace.root")
@@ -106,6 +126,7 @@ def load(path: str | Path) -> Config:
     _reject_unknown(container, {"image"}, "container")
 
     quartus, edition = _quartus(_table(raw, "quartus"))
+    questa = _questa(_table(raw, "questa"))
 
     jobs = _table(raw, "jobs")
     _reject_unknown(jobs, {"database", "timeout_s"}, "jobs")
@@ -121,6 +142,7 @@ def load(path: str | Path) -> Config:
         image=container.get("image", DEFAULT_IMAGE),
         quartus=quartus,
         edition=edition,
+        questa=questa,
         jobs_db=Path(jobs.get("database", state / "jobs.sqlite")),
         job_timeout_s=int(jobs.get("timeout_s", DEFAULT_JOB_TIMEOUT_S)),
         rag_db=Path(rag.get("database", state / "documents.sqlite")),
@@ -161,6 +183,26 @@ def _quartus(table: dict) -> tuple[dict[str, Quartus], str | None]:
         edition = next(iter(installs))
 
     return installs, edition
+
+
+def _questa(table: dict) -> Questa | None:
+    """_questa - the host Questa installation, when one is configured
+
+    Questa reads Verilog, SystemVerilog and VHDL in one simulation, which no
+    open simulator does, so it is what runs a mixed-language testbench whole.
+    It is proprietary and licensed, so it is never assumed: without the
+    section, simulate() keeps to the containerised simulators.
+
+    Raises ConfigError if the configured root holds no bin/vsim.
+    """
+    if not table:
+        return None
+
+    _reject_unknown(table, {"root", "env"}, "questa")
+    root = _directory(_require({"questa": table}, "questa", "root"), "questa.root")
+    if not (root / "bin" / "vsim").is_file():
+        raise ConfigError(f"questa.root holds no bin/vsim: {root}")
+    return Questa(root=root, env=dict(table.get("env", {})))
 
 
 def _table(raw: dict, name: str) -> dict:
