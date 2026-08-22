@@ -21,15 +21,19 @@ from dataclasses import dataclass
 from pathlib import Path
 
 RUNNING = "running"
-SUCCEEDED = "succeeded"
+DONE = "done"
 FAILED = "failed"
 CANCELLED = "cancelled"
+#: Not in the vocabulary PROJECT.md 4.2 lists. That vocabulary assumes the
+#: exit marker always exists, which holds only because WEFT writes it: a
+#: SIGKILL leaves nothing behind. Calling that "failed" would claim knowledge
+#: of an exit status nobody ever saw.
 LOST = "lost"
 
 #: Quartus return codes. 0 and 2-4 are documented; 1 is not, but a SIGTERM'd
 #: quartus_sh exits with it normally rather than being reported as signalled.
 EXIT_STATUS = {
-    0: SUCCEEDED,
+    0: DONE,
     1: CANCELLED,
     2: FAILED,
     3: FAILED,

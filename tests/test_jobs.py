@@ -16,7 +16,7 @@ from weft.jobs import (
     FAILED,
     LOST,
     RUNNING,
-    SUCCEEDED,
+    DONE,
     JobError,
     JobStore,
 )
@@ -57,7 +57,7 @@ def settle(store, job_id, wanted=None):
 def test_successful_job_ends_succeeded(store, tmp_path):
     job = run(store, tmp_path, ["/bin/true"])
     assert job.status == RUNNING
-    assert settle(store, job.id).status == SUCCEEDED
+    assert settle(store, job.id).status == DONE
 
 
 def test_failing_job_keeps_its_exit_code(store, tmp_path):
@@ -86,7 +86,7 @@ def test_cancel_stops_a_running_job(store, tmp_path):
 def test_cancelling_a_finished_job_is_harmless(store, tmp_path):
     job = run(store, tmp_path, ["/bin/true"])
     settle(store, job.id)
-    assert store.cancel(job.id).status == SUCCEEDED
+    assert store.cancel(job.id).status == DONE
 
 
 def test_state_survives_a_restart(tmp_path):
