@@ -172,7 +172,7 @@ The same structure applies to VHDL entities using `--` comments. `generate_docs`
 | M6 | Pro-edition support (paths + FlexLM env), `list_devices`, `program_device`, Streamable HTTP + token | Demo bitstream programmed onto a board via MCP |
 
 ## Appendix A — Air-gapped deployment (DevOps hand-off; out of scope)
-- Client model: Kimi K2 on **8× H100 80 GB**. Per current deployment guidance, the INT4 variant (~594 GB of weights) is the minimum fit for 8× H100 — workable, but KV-cache headroom is small (short contexts, low concurrency). FP8 (~1 TB) needs 16× H100 or 8× H200.
+- Client model: Kimi K2 on **32× NVIDIA H100 80 GB** — 2.56 TB of aggregate HBM. That is enough for the FP8 variant (~1 TB of weights) with the rest left for KV cache, which removes the constraint that shaped the earlier 8-GPU sizing: INT4 (~594 GB) is no longer the only variant that fits, and long contexts and real concurrency stop competing with the weights for memory. Sizing at this scale is a tensor/pipeline-parallel layout question rather than a fit question, and belongs with whoever owns the cluster.
 - Serving: vLLM or SGLang (both expose an OpenAI-compatible endpoint and ship a K2 tool-call parser); SGLang is recommended for agentic workloads with structured output.
 - Agent bridge: OpenAI Agents SDK with overridden `base_url`, or a thin custom tool loop; it connects to the same Streamable HTTP endpoint — zero changes on the MCP server side.
 - Offline transfer: Podman image (`podman save/load`), pip wheels, BGE-M3 weights, tessdata, model weights for the inference cluster.
