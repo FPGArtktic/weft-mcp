@@ -108,11 +108,17 @@ The primary client is Claude (Desktop / Code) over MCP stdio or Streamable HTTP.
 
 ### 5.3 RAG runtime
 - Embedding and retrieval run in the server process; no dedicated container. Document *ingestion* (PDF text extraction and OCR) is delegated to `weft-tools`, so the host needs no Tesseract or Poppler.
-- BGE-M3 through **ONNX Runtime** (MIT), CPU by default. Not FlagEmbedding: it
-  declares no licence at all in its metadata, which grants nothing and is a
-  harder bar than an incompatible licence, and it hard-requires torch,
-  transformers, datasets, accelerate, peft and sentencepiece. ONNX Runtime
-  needs none of them and has wheels for the interpreters this runs on.
+- BGE-M3 through **ONNX Runtime** (MIT), CPU by default, rather than through
+  FlagEmbedding. The reason is weight, not licensing: FlagEmbedding is MIT —
+  its repository carries the licence, even though its PyPI metadata leaves the
+  field empty — but it hard-requires torch, transformers, datasets, accelerate,
+  peft and sentencepiece, which is gigabytes of dependency to compute one
+  embedding. ONNX Runtime needs none of them and has wheels for the
+  interpreters this targets.
+- On reading licences: the repository is the authority, not the package
+  metadata. An empty `license` field on PyPI means the packaging was not filled
+  in, and concluding anything about the project's terms from it is a mistake
+  worth naming here so it is not repeated.
 - The embedding runtime is a library, not a program WEFT executes, so the rule
   in §5.2 does not reach it and there is nothing to gain by containerising it:
   sqlite-vec has to live in the server process because it is the store, and
