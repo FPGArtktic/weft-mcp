@@ -11,6 +11,33 @@ the summary you can read in a minute.
 
 [semver]: https://semver.org/spec/v2.0.0.html
 
+## Unreleased
+
+### Added
+
+- `fastloop`: `simulate(..., simulator="questa")` runs the host Questa - Altera
+  Starter FPGA Edition. It reads Verilog, SystemVerilog and VHDL in one
+  simulation, which no open simulator does, so a mixed-language hierarchy runs
+  whole instead of a module at a time with the other language left out. It is
+  proprietary and licensed, so it is never a default and needs a `[questa]`
+  section naming its root; without one, simulation keeps to the container.
+  The verdict comes from Questa's `TESTSTATUS` rather than the exit status:
+  `vsim -c` exits 0 after a `$fatal`, so a run that stopped on a failed
+  assertion would otherwise be indistinguishable from one that passed. A
+  warning passes, an error or a fatal fails.
+- `Documentation`: a Sphinx manual, built on Read the Docs. The tool reference
+  is read out of the running server and the configuration reference out of the
+  same checks that decide what the loader refuses, so neither can drift from
+  the code. Neither is committed: they are output.
+
+### Changed
+
+- Whether a source set has to be narrowed to one language turned out to be a
+  property of the simulator rather than of simulation, so selection now
+  decides the tool first and the sources afterwards. Naming a simulator
+  therefore resolves a mixed set that would previously have needed a testbench
+  to choose by.
+
 ## [0.5.0] — 2026-08-22
 
 Milestone 5 — documentation generated from facts.

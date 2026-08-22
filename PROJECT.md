@@ -61,9 +61,10 @@ The primary client is Claude (Desktop / Code) over MCP stdio or Streamable HTTP.
 - Per-job limits: wall-clock timeout always; CPU/memory limits via `systemd-run --user --scope` when available.
 - `parse_reports(project)` — JSON: resource usage (ALMs/LUTs, block RAM bits, DSPs, pins), timing per clock domain (Fmax, WNS, TNS), critical warnings ranked by severity, with report file references.
 
-### 4.3 Fast loop (containerized, no Quartus involved)
+### 4.3 Fast loop (containerized, no Quartus involved; Questa excepted)
 - `lint(files, language)` — `verilator --lint-only` (SV/Verilog), `ghdl -a --std=08` (VHDL) inside `weft-tools`; returns structured diagnostics (file, line, severity, message).
-- `simulate(files, top, testbench)` — Verilator / Icarus / GHDL inside `weft-tools`; returns pass/fail, log tail, path to VCD/FST waveform.
+- `simulate(files, top, testbench, simulator)` — Verilator / Icarus / GHDL inside `weft-tools`; returns pass/fail, log tail, path to VCD/FST waveform.
+- `simulate(..., simulator="questa")` — **host** Questa - Altera Starter FPGA Edition, when a `[questa]` section names it. It is the only simulator here that reads Verilog, SystemVerilog and VHDL in one run, so it is what simulates a mixed-language hierarchy whole rather than a module at a time. Proprietary and licensed, therefore never a default and never containerised. The verdict comes from Questa's `TESTSTATUS`, not from the exit status: `vsim -c` exits 0 after a `$fatal`.
 
 ### 4.4 Documentation RAG with OCR
 - `index_document(path, doc_type)` — PDF ingestion, executed inside `weft-tools`: direct text extraction (`pdftotext`) when a text layer exists; Tesseract OCR for scanned pages. No OCR or PDF binary is a host prerequisite. Chunks carry metadata: file, page, section heading; IEEE standards additionally carry the clause number (e.g. `1800-2023 §13.4`) for precise citation.

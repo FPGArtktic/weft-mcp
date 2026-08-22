@@ -17,7 +17,7 @@ WEFT is under construction, milestone by milestone. What is finished today:
 | Tool | State |
 |---|---|
 | `lint` | working — Verilator for Verilog and SystemVerilog, GHDL for VHDL |
-| `simulate` | working — Verilator, Icarus or GHDL, with waveform capture |
+| `simulate` | working — Verilator, Icarus or GHDL in the container, host Questa for mixed-language designs, with waveform capture |
 | Quartus projects | working — `create_project`, `set_assignments`, `get_project_info`, `list_projects` |
 | Quartus compilation | working — `start_compile` as a persistent job, `get_job_status`, `get_job_log`, `cancel_job` |
 | `parse_reports` | working — resources, timing per clock, ranked messages |
@@ -100,6 +100,8 @@ the server actually accepts. Build it yourself with
 ## Requirements
 
 - **Quartus Prime 25.1** (Lite, Standard or Pro) installed and licensed by you
+- **Questa - Altera Starter FPGA Edition**, optional; it ships beside Quartus and is
+  the only way to simulate a design that mixes Verilog and VHDL in one run
 - **Podman**, rootless
 - **Python 3.11 or newer**
 - `jtagd` for programming hardware, once that milestone lands
@@ -172,6 +174,12 @@ root = "/home/you/intelFPGA_lite/25.1std/quartus"
 root = "/opt/intelFPGA_pro/25.1/quartus"
 # FlexLM variables are passed through to every Pro invocation.
 env = { LM_LICENSE_FILE = "1800@licence-server" }
+
+[questa]
+# Ships beside Quartus. The only simulator here that reads Verilog,
+# SystemVerilog and VHDL in one run. Never a default — ask for it by name.
+root = "/home/you/altera_lite/25.1std/questa_fse"
+env = { SALT_LICENSE_SERVER = ";/home/you/.altera.quartus/questa_lic.dat" }
 
 [jobs]
 timeout_s = 7200
@@ -247,6 +255,37 @@ Building that deployment — the inference cluster, the serving stack, carrying
 the image and the wheels across the gap — is not part of this repository.
 Appendix A of [PROJECT.md](PROJECT.md) records what it would take and stops
 there, deliberately.
+
+## Simulating a mixed-language design
+
+Verilator, Icarus and GHDL each read one language. A design written in more
+than one can therefore only be simulated a module at a time, with the other
+language's blocks left out — which is exactly the part a hierarchy test exists
+to exercise. `simulate` says so honestly: the sources it dropped come back in
+`excluded`.
+
+Questa reads all three at once. If the configuration names it, ask for it:
+
+```jsonc
+simulate {
+  "files": ["src/counter_top.sv", "src/debouncer.sv", "src/updown_counter.sv",
+            "src/clk_tick.v", "src/seven_seg_decoder.vhd"],
+  "top": "counter_top_tb",
+  "testbench": "tb/counter_top_tb.sv",
+  "simulator": "questa"
+}
+```
+
+`excluded` comes back empty: the VHDL decoder is elaborated inside the
+SystemVerilog top, and the whole hierarchy runs. Questa is proprietary and
+licensed, so it runs on the host like Quartus does and is never picked by
+default — you name it.
+
+One thing worth knowing, since it decides whether the result means anything:
+`vsim -c` exits 0 after a `$fatal`, so a run that stopped on a failed
+assertion looks exactly like one that passed. WEFT reads Questa's own
+`TESTSTATUS` after the run instead, and reports a warning as a pass, an error
+or a fatal as a failure.
 
 ## Reading your own documents
 
