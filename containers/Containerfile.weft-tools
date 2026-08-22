@@ -55,10 +55,13 @@ FROM archlinux:base
 
 COPY --from=builder /home/builder/pkgs /tmp/pkgs
 
-# gcc-ada is GHDL's runtime dependency (libgnat), not a build-only one.
+# gcc-ada is GHDL's runtime dependency (libgnat), not a build-only one, and it
+# drags in the C++ compiler. make is not optional either: Verilator's --binary
+# mode compiles the simulation before running it.
 RUN pacman -Syu --noconfirm --needed \
         verilator \
         iverilog \
+        make \
         gcc-ada \
         tesseract tesseract-data-eng tesseract-data-pol \
         poppler \
