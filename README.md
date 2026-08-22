@@ -95,10 +95,11 @@ Nothing reaches the network at runtime, and nothing reports telemetry.
 The full design — every tool's arguments and return shape, the milestones,
 and the reasoning behind the awkward parts — is in [PROJECT.md](PROJECT.md).
 
-The manual is built with Sphinx from [`Documentation/`](Documentation/) and
-published on Read the Docs. Its tool reference and configuration reference
-are generated from the code on every build, so neither can drift from what
-the server actually accepts. Build it yourself with
+The manual is at **[weft-mcp.readthedocs.io](https://weft-mcp.readthedocs.io/en/latest/)**,
+built with Sphinx from [`Documentation/`](Documentation/). Its tool reference
+and configuration reference are generated from the code on every build, so
+neither can drift from what the server actually accepts — a key added without
+a description fails the build. Build it yourself with
 `pip install -e '.[docs]' && sphinx-build -W Documentation _build`.
 
 ## Requirements
@@ -160,9 +161,9 @@ the first time.
 
 WEFT reads one TOML file, found at `--config`, then `$WEFT_CONFIG`, then
 `~/.config/weft/weft.toml`. Only `[workspace]` is required. Every key is
-documented in the [configuration reference](Documentation/), which is
-generated from the loader itself and fails the documentation build if a key
-is added without being described.
+documented in the
+[configuration reference](https://weft-mcp.readthedocs.io/en/latest/configuration.html),
+generated from the loader itself.
 
 ```toml
 [workspace]
