@@ -24,6 +24,11 @@ Milestone 2 — Quartus compilation as persistent jobs.
   sent, so a job killed along with its shell is known to have been cancelled
   rather than merely lost. Process identity is checked against the start time
   from `/proc`, and a zombie counts as dead.
+- `quartus`: `create_project`, `set_assignments` and `list_projects`, driving
+  the `::quartus::project` Tcl API rather than writing `.qsf` text. All four
+  assignment forms are supported, `set_parameter` included. Client-supplied
+  values are brace quoted, and a value carrying braces or a backslash is
+  refused rather than escaped.
 - `quartus`: installation probe. Edition comes from the version banner, not
   from which binaries are present: a Lite installation ships the Pro-only
   `quartus_syn` as a stub that refuses to run, so testing for the file would
