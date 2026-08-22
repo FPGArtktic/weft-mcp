@@ -23,6 +23,8 @@ dependencies = [
     "onnxruntime>=1.20",
     # Required by onnxruntime, and used directly to normalise embeddings.
     "numpy>=1.26",
+    # BGE-M3's tokenizer. Apache-2.0, which GPLv3 accepts and GPLv2 did not.
+    "tokenizers>=0.20",
 ]
 
 [project.urls]
