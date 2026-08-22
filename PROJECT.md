@@ -36,7 +36,7 @@ The primary client is Claude (Desktop / Code) over MCP stdio or Streamable HTTP.
 |---|---|
 | License | **GPL-3.0-only**, SPDX headers in every file, DCO sign-off (kernel model) |
 | Quartus | **Installed on the host**, both Lite/Standard and Pro; WEFT calls host binaries, edition and install paths set in config |
-| Open-source tooling | **In Podman**: one `weft-tools` image, **Arch Linux base**, containing Verilator, Icarus Verilog, GHDL, Verible, cocotb |
+| Open-source tooling | **In Podman**: one `weft-tools` image, **Arch Linux base**, containing Verilator, Icarus Verilog, GHDL, Verible |
 | Embeddings | **BGE-M3** (dense vectors, 1024-dim, 8k-token context), run locally |
 | Vector store | **sqlite-vec** — single-file database, no extra infrastructure |
 | Job model | Persistent queue backed by SQLite; jobs survive server restart |
@@ -105,7 +105,7 @@ The primary client is Claude (Desktop / Code) over MCP stdio or Streamable HTTP.
 - Configuration: single TOML file — Quartus install paths per edition (`quartus.lite.root`, `quartus.pro.root`), default edition, workspace root, container image name, embedding model path, HTTP port, job limits.
 
 ### 5.2 Container (Podman, rootless)
-- **One image: `weft-tools`**, based on **`archlinux:base`** — every external binary WEFT shells out to, except Quartus itself: Verilator, Icarus Verilog, GHDL, Verible, cocotb, plus Tesseract with its language data and Poppler (`pdftotext`) for the RAG ingest path, plus a Python layer for helper scripts. Packages come from the official repositories where available; the two that do not (GHDL and Verible) are built in a separate builder stage, so the final image carries no AUR helper.
+- **One image: `weft-tools`**, based on **`archlinux:base`** — every external binary WEFT shells out to, except Quartus itself: Verilator, Icarus Verilog, GHDL, Verible, plus Tesseract with its language data and Poppler (`pdftotext`) for the RAG ingest path, plus a Python layer for helper scripts. Packages come from the official repositories where available; the two that do not (GHDL and Verible) are built in a separate builder stage, so the final image carries no AUR helper.
 - **The image is never distributed.** The repository ships `containers/Containerfile.weft-tools` and nothing else; every user builds the image locally with `podman build`. WEFT therefore distributes only its own GPL-3.0-only code, never an aggregate of third-party binaries under mixed licences — see §7.
 - Invocation: `podman run --rm --network=none -v <workspace>:/work weft-tools …`.
 - Only the workspace directory is mounted; all user-supplied paths are validated against the workspace root (path-traversal protection). The same validation applies to host-side Quartus invocations — WEFT never touches files outside the workspace.

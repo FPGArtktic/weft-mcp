@@ -51,6 +51,13 @@ the summary you can read in a minute.
   same checks that decide what the loader refuses, so neither can drift from
   the code. Neither is committed: they are output.
 
+### Removed
+
+- `containers`: cocotb. It was in the image and in the specification from the
+  start and nothing ever called it — `simulate` never learned a cocotb mode, so
+  it was weight in the image and a promise in the specification the code did not
+  keep. Removed rather than left to look like a feature.
+
 ### Changed
 
 - Whether a source set has to be narrowed to one language turned out to be a

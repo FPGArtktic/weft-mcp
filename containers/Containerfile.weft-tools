@@ -39,10 +39,9 @@ RUN git clone --depth 1 https://aur.archlinux.org/yay-bin.git \
 # verible-bin   Apache-2.0. Upstream release binaries on purpose: building
 #               Verible from source pulls in Bazel and takes roughly half an
 #               hour, which is not a fair thing to ask of every user.
-# python-cocotb BSD-3-Clause, needed by the simulate path.
 RUN yay -S --noconfirm --needed --removemake \
         --answerclean None --answerdiff None --answeredit None \
-        ghdl verible-bin python-cocotb
+        ghdl verible-bin
 
 # Hand the built packages to the final stage.
 RUN mkdir -p /home/builder/pkgs \
