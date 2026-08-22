@@ -68,10 +68,27 @@ def test_build_products_stay_out_of_the_workspace(image, tmp_path, canned):
     assert "--workdir=/tmp/weft-build" in seen["script"]
 
 
-def test_mixed_language_set_is_refused(image, tmp_path, canned):
+def test_mixed_set_without_a_testbench_is_refused(image, tmp_path, canned):
+    """With nothing to decide by, guessing would simulate the wrong half."""
     canned()
-    with pytest.raises(SimulationError, match="mixed-language"):
+    with pytest.raises(SimulationError, match="spans both languages"):
         simulate(image, tmp_path, ["a.sv", "b.vhd"], top="tb")
+
+
+def test_testbench_picks_the_language_out_of_a_mixed_set(image, tmp_path, canned):
+    """Pointing a whole mixed project at one testbench simulates one module."""
+    seen = canned()
+    got = simulate(image, tmp_path, ["dut.sv", "other.vhd"], top="tb", testbench="tb.vhd")
+    assert got.simulator == "ghdl"
+    assert got.excluded == ["dut.sv"]
+    assert "/work/other.vhd" in seen["script"]
+    assert "/work/tb.vhd" in seen["script"]
+    assert "dut.sv" not in seen["script"]
+
+
+def test_excluded_is_empty_for_a_single_language_run(image, tmp_path, canned):
+    canned()
+    assert simulate(image, tmp_path, ["a.vhd"], top="a_tb").excluded == []
 
 
 def test_simulator_must_match_the_language(image, tmp_path, canned):

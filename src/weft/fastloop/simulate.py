@@ -63,6 +63,8 @@ class Simulation:
     @waveform: workspace-relative path to a waveform, or None if none was
                written; only GHDL is told where to write one, the Verilog
                simulators write one only if the testbench dumps
+    @excluded: sources left out because they are written in the other
+               language; empty for a single-language run
     """
 
     passed: bool
@@ -70,6 +72,7 @@ class Simulation:
     simulator: str
     log: str
     waveform: str | None
+    excluded: list[str]
 
 
 def simulate(
@@ -99,21 +102,26 @@ def simulate(
     simulator agrees on. A testbench that reports its verdict by printing and
     then finishing normally counts as passed; its own words are in @log.
 
+    A source set spanning both languages is not refused when @testbench names
+    one of them: the testbench decides which language runs, the rest is left
+    out, and the excluded files are named in the result. That is how a single
+    module of a mixed-language design gets simulated.
+
     Return: a Simulation describing the run.
 
-    Raises SimulationError for an empty or mixed-language source set, an
-    unknown simulator, or a simulator that cannot read the sources given;
-    SandboxError if a path escapes the workspace; PodmanError if the container
-    could not start.
+    Raises SimulationError for an empty source set, a set spanning both
+    languages with no testbench to choose between them, an unknown simulator,
+    or a simulator that cannot read the sources given; SandboxError if a path
+    escapes the workspace; PodmanError if the container could not start.
     """
     sources = list(files) + ([testbench] if testbench else [])
     if not sources:
         raise SimulationError("no sources to simulate")
 
-    language = _language(sources)
+    language, kept, excluded = _select(sources, testbench)
     tool = _tool(simulator, language)
 
-    paths = [str(container_path(workspace, s)) for s in sources]
+    paths = [str(container_path(workspace, s)) for s in kept]
     waves = _wave_dir(workspace)
     started = time.time()
 
@@ -126,14 +134,28 @@ def simulate(
         simulator=tool,
         log=_tail(result.output, log_lines),
         waveform=_waveform(workspace, waves, started),
+        excluded=excluded,
     )
 
 
-def _language(sources: list[str]) -> str:
-    """_language - decide which language the source set is written in.
+def _select(sources: list[str], testbench: str | None) -> tuple[str, list[str], list[str]]:
+    """_select - decide which language runs and which sources take part
 
-    A mixed set is an error: no open simulator reads both, and saying so is
-    more useful than letting one of them fail on a file it cannot parse.
+    @sources: every file the caller offered, testbench included
+    @testbench: the testbench source, or None
+
+    No open simulator reads Verilog and VHDL in one run, so at most one
+    language can take part. When the set spans both and a testbench names one
+    of them, that language wins and the rest is set aside: pointing a whole
+    mixed project at one testbench is how a single module gets simulated.
+    Without a testbench there is nothing to decide by, and guessing would
+    silently simulate the wrong half.
+
+    Return: the language, the sources to hand the simulator, and the sources
+    left out.
+
+    Raises SimulationError for an unrecognised suffix, or for a set spanning
+    both languages with no testbench.
     """
     found = {}
     for s in sources:
@@ -143,13 +165,21 @@ def _language(sources: list[str]) -> str:
             raise SimulationError(f"unrecognised source type: {s}")
         found.setdefault(language, []).append(s)
 
-    if len(found) > 1:
+    if len(found) == 1:
+        language, kept = next(iter(found.items()))
+        return language, kept, []
+
+    listing = "; ".join(f"{lang}: {', '.join(fs)}" for lang, fs in sorted(found.items()))
+    if testbench is None:
         raise SimulationError(
-            "mixed-language source set: "
-            + "; ".join(f"{lang}: {', '.join(fs)}" for lang, fs in sorted(found.items()))
-            + ". No open simulator reads both Verilog and VHDL in one run"
+            f"source set spans both languages ({listing}). No open simulator reads "
+            "both Verilog and VHDL in one run; name a testbench to pick the "
+            "language to simulate"
         )
-    return next(iter(found))
+
+    language = SUFFIX_LANGUAGE[Path(testbench).suffix.lower()]
+    excluded = [s for lang, fs in sorted(found.items()) if lang != language for s in fs]
+    return language, found[language], excluded
 
 
 def _tool(simulator: str | None, language: str) -> str:
