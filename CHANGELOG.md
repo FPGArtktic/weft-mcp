@@ -11,7 +11,49 @@ the summary you can read in a minute.
 
 [semver]: https://semver.org/spec/v2.0.0.html
 
-## Unreleased
+## [0.4.0] — 2026-08-22
+
+Milestone 4 — document retrieval with OCR.
+
+### Added
+
+- `rag`: `index_document`, reading a PDF page by page. Whether a page needs OCR
+  is decided per page, not per document: a page with a text layer is taken from
+  `pdftotext`, and only a page that comes back nearly empty is rendered and
+  passed to Tesseract. Scanned documents therefore work, and born-digital ones
+  do not pay for it — IEEE 1800-2017 is 1315 pages and needed OCR on none of
+  them, which is three seconds rather than an hour.
+- `rag`: clause-aware chunking. A standard is cut at its own headings, so a
+  citation names `1800-2017 §9.2.2.4` and a reader can look it up; a chunk
+  number could not be checked against anything. Of 2850 chunks from IEEE
+  1800-2017, 2727 carry a clause. The designation itself is read from the
+  running heads, which are also removed — left in, the document's title would
+  sit in every chunk and match every search for it.
+- `rag`: `search_docs` and `list_indexed_docs`. A result states which retrieval
+  answered it. That is not decoration: a caller told the ordering was semantic
+  when it was a substring match would trust a ranking that does not mean what
+  it looks like.
+- `rag`: embeddings from BGE-M3 through ONNX Runtime, which keeps PyTorch and
+  a CUDA stack out of a server that must run offline. Vectors live in a
+  `sqlite-vec` table beside the chunks, and are written only when a model is
+  configured — without one, WEFT still indexes and still retrieves, by text.
+
+### Notes
+
+- Batches are sorted by length before encoding. A batch is padded to its
+  longest member, so a mixed batch spends most of its arithmetic on padding:
+  measured against IEEE 1800-2017, an unsorted batch of 32 computes 1.67× the
+  tokens that are actually there, and a length-sorted one 1.01×. This was
+  found by noticing that smaller batches ran *faster*, which should not happen.
+- Retrieval was compared on the full standard, 2850 chunks embedded in 32
+  minutes on a CPU. Text search answers a query that names a term — `randcase`
+  lands on §18.16 — and answers nothing at all when the question is a
+  sentence: all four natural-language queries returned zero. Vector search
+  answered three of them correctly, including "abstract methods without
+  implementation" → §8.21 and "weighted random selection" → §18.16. The fourth,
+  "how do I model a flip-flop", has no good answer in that document: the
+  standard defines the language and never sets out to teach modelling, and the
+  term appears eleven times in passing and in no heading.
 
 ### Changed
 
@@ -100,6 +142,7 @@ Milestone 1 — the fast loop.
 - `Documentation`: the counter demonstration project, written in
   SystemVerilog, Verilog-2001 and VHDL at once.
 
+[0.4.0]: https://github.com/FPGArtktic/weft-mcp/releases/tag/v0.4.0
 [0.3.0]: https://github.com/FPGArtktic/weft-mcp/releases/tag/v0.3.0
 [0.2.0]: https://github.com/FPGArtktic/weft-mcp/releases/tag/v0.2.0
 [0.1.0]: https://github.com/FPGArtktic/weft-mcp/releases/tag/v0.1.0
