@@ -91,8 +91,10 @@ def build(config: Config) -> MCPServer:
     @server.tool(
         description=(
             "Build and run a testbench. The simulator follows from the sources' "
-            "suffixes unless one is named. A source set mixing Verilog and VHDL "
-            "is refused: no open simulator reads both in one run."
+            "suffixes unless one is named. No open simulator reads Verilog and "
+            "VHDL in one run, so a source set spanning both is narrowed to the "
+            "language of the testbench and the files left out are listed in the "
+            "result; without a testbench to choose by, such a set is refused."
         )
     )
     def simulate(
@@ -108,7 +110,8 @@ def build(config: Config) -> MCPServer:
         @testbench: testbench source, if not already in @files
         @simulator: "verilator", "icarus" or "ghdl"; defaults by language
 
-        Return: pass or fail, the tail of the log, and any waveform written.
+        Return: pass or fail, the tail of the log, any waveform written, and
+        the sources excluded as belonging to the other language.
         """
         result = run_simulate(
             config.image,
@@ -188,6 +191,7 @@ def main(argv: list[str] | None = None) -> int:
     Return: 0 on a clean shutdown, 2 when the configuration is unusable.
     """
     parser = argparse.ArgumentParser(prog="weft", description="MCP server for the Quartus flow")
+    parser.add_argument("--version", action="version", version=f"weft {__version__}")
     parser.add_argument("--config", help=f"configuration file (default: {DEFAULT_CONFIG})")
     parser.add_argument(
         "--transport",
