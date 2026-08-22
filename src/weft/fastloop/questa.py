@@ -32,8 +32,12 @@ ACCESS = "+acc"
 
 VHDL_STANDARD = "2008"
 
-#: The transcript is prefixed with "# " by vsim; the marker survives it.
 VERSION_TIMEOUT = 60
+
+#: The ini-file note every invocation prints. It is about Questa's own
+#: configuration, not about the sources, and it would be the first line of
+#: every lint result.
+NOISE = ("vlog-220", "vcom-220", "vsim-220")
 
 
 class QuestaError(RuntimeError):
@@ -213,3 +217,56 @@ def _tool(install: Install, directory: Path, argv: list[str], timeout: float | N
 def _environ() -> dict[str, str]:
     """_environ - the server's own environment, which the tools inherit."""
     return dict(os.environ)
+
+
+def check(
+    install: Install,
+    workspace: Path,
+    scratch: Path,
+    verilog: list[str],
+    vhdl: list[str],
+    timeout: float | None = None,
+) -> Result:
+    """check - compile the sources without simulating them
+
+    @install: the probed installation
+    @workspace: sandbox root, and the working directory of every step, so the
+                diagnostics name the paths the caller gave
+    @scratch: directory for the work library, kept out of the workspace
+    @verilog: Verilog and SystemVerilog sources, workspace-relative
+    @vhdl: VHDL sources, workspace-relative
+    @timeout: wall-clock limit for the whole check
+
+    This is a compile check with the vendor's own front-end, not a style
+    linter: full lint is a licensed Questa feature the Starter Edition does
+    not carry. What it does give is the front-end Questa itself will use --
+    it accepts SystemVerilog Verilator refuses and refuses what Verilator
+    wrongly accepts -- and it reads both languages in one pass, so a VHDL
+    entity instantiated from SystemVerilog is actually resolved.
+
+    Return: a Result carrying the combined transcript. The exit status is the
+    worst of the steps; the diagnostics in the transcript are what matters.
+
+    Raises QuestaError if a step could not be started at all.
+    """
+    library = scratch / "work"
+    transcript: list[str] = []
+    worst = 0
+
+    made = _tool(install, workspace, ["vlib", str(library)], timeout)
+    transcript.append(made.output)
+    if made.returncode != 0:
+        return Result(made.returncode, "\n".join(transcript))
+
+    steps = []
+    if vhdl:
+        steps.append(["vcom", f"-{VHDL_STANDARD}", "-lint", "-work", str(library), *vhdl])
+    if verilog:
+        steps.append(["vlog", "-sv", "-lint", "-work", str(library), *verilog])
+
+    for argv in steps:
+        done = _tool(install, workspace, argv, timeout)
+        transcript.append(done.output)
+        worst = max(worst, done.returncode)
+
+    return Result(worst, "\n".join(transcript))

@@ -197,23 +197,42 @@ def build(config: Config) -> MCPServer:
     @server.tool(
         description=(
             "Lint HDL sources without simulating them. Verilator handles Verilog "
-            "and SystemVerilog, GHDL handles VHDL; a design written in both is "
-            "linted one language at a time."
+            "and SystemVerilog, GHDL handles VHDL, and a design written in both "
+            "is checked one language at a time with the rest named in excluded. "
+            "linter=questa checks it whole with the vendor front-end, if one is "
+            "configured -- a compile check rather than a style linter."
         )
     )
-    def lint(files: list[str], language: str) -> dict[str, Any]:
+    def lint(
+        files: list[str], language: str | None = None, linter: str | None = None
+    ) -> dict[str, Any]:
         """lint - report diagnostics for a set of sources
 
         @files: workspace-relative paths, in dependency order for VHDL
-        @language: "verilog" (covers SystemVerilog) or "vhdl"
+        @language: "verilog" (covers SystemVerilog) or "vhdl"; inferred from
+                   the suffixes when not given
+        @linter: "verilator", "ghdl" or "questa"; defaults by language. Questa
+                 reads both languages in one pass, so it checks a mixed design
+                 whole, and needs a [questa] section.
 
-        Return: the diagnostics and how many there were in total.
+        Return: the diagnostics, how many there were, which linter ran, and
+        the sources left out as belonging to the other language.
         """
-        found = run_lint(config.image, config.workspace, files, language)
+        result = run_lint(
+            config.image,
+            config.workspace,
+            files,
+            language=language,
+            linter=linter,
+            install=questas.get(),
+        )
+        found = result.diagnostics
         return {
+            "linter": result.linter,
             "total": len(found),
             "returned": min(len(found), MAX_DIAGNOSTICS),
             "diagnostics": [asdict(d) for d in found[:MAX_DIAGNOSTICS]],
+            "excluded": result.excluded,
         }
 
     @server.tool(

@@ -100,9 +100,20 @@ simulate { "files": ["src/seven_seg_decoder.vhd"], "top": "seven_seg_decoder_tb"
 the testbench decides which language runs, and the files left out are named in
 the result.
 
-One thing to expect from `lint`: linting `counter_top.sv` reports
-`MODMISSING` for `seven_seg_decoder`. The module is not missing, it is written
-in VHDL and Verilator cannot see it. Linting each module on its own is clean.
+One thing to expect from `lint`: linting `counter_top.sv` with Verilator
+reports `MODMISSING` for `seven_seg_decoder`. The module is not missing — it is
+written in VHDL, and Verilator cannot see it. Linting each module on its own is
+clean, and so is linting the whole thing through Questa, which reads both
+languages:
+
+```jsonc
+lint { "files": ["src/counter_top.sv", "src/debouncer.sv", "src/updown_counter.sv",
+                 "src/clk_tick.v", "src/seven_seg_decoder.vhd"],
+       "linter": "questa" }
+```
+
+That returns no diagnostics and an empty `excluded`. The same file list given
+to Verilator returns the false `MODMISSING` and names the VHDL it had to drop.
 
 ## The `docs/` directory
 
