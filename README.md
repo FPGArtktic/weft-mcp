@@ -180,11 +180,12 @@ rebase rather than merge, and a `Signed-off-by:` line on everything. See
 
 ## Author
 
-WEFT is written and maintained by **Mateusz Okulanis**
-([@FPGArtktic](https://github.com/FPGArtktic)), who can be reached at
-FPGArtktic@outlook.com. Bug reports, patches and disagreements are all
-welcome — the last of those especially, if you have driven this toolchain
-harder than I have.
+WEFT is written and maintained by **Mateusz Okulanis** —
+[fpgartktic.github.io](https://fpgartktic.github.io/about/),
+[@FPGArtktic](https://github.com/FPGArtktic), FPGArtktic@outlook.com.
+
+Bug reports, patches and disagreements are all welcome — the last of those
+especially, if you have driven this toolchain harder than I have.
 
 ## Licence
 

@@ -15,6 +15,11 @@ authors = [{ name = "Mateusz Okulanis", email = "FPGArtktic@outlook.com" }]
 # mcp is the official MCP Python SDK (FastMCP); MIT, so GPL-2.0-only compatible.
 dependencies = ["mcp>=2.0.0"]
 
+[project.urls]
+Homepage = "https://fpgartktic.github.io/about/"
+Repository = "https://github.com/FPGArtktic/weft-mcp"
+Issues = "https://github.com/FPGArtktic/weft-mcp/issues"
+
 [project.scripts]
 weft = "weft.server:main"
 
