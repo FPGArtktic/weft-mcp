@@ -24,6 +24,10 @@ Milestone 2 — Quartus compilation as persistent jobs.
   sent, so a job killed along with its shell is known to have been cancelled
   rather than merely lost. Process identity is checked against the start time
   from `/proc`, and a zombie counts as dead.
+- `quartus`: `start_compile`, running the whole flow or one stage as a
+  persistent job, with progress read from the phases the tool announces in its
+  own log. A single stage runs its own executable rather than going through
+  the flow, so nothing else is re-run on the way.
 - `quartus`: `create_project`, `set_assignments` and `list_projects`, driving
   the `::quartus::project` Tcl API rather than writing `.qsf` text. All four
   assignment forms are supported, `set_parameter` included. Client-supplied
