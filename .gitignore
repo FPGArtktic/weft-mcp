@@ -15,3 +15,11 @@ build/
 # workspace + RAG stores (never committed)
 *.sqlite
 *.sqlite-*
+
+# Quartus build artifacts in examples/
+db/
+incremental_db/
+output_files/
+simulation/
+*.qws
+.weft/

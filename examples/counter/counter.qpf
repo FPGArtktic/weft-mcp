@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# Quartus project file. Written by hand rather than generated, so that no
+# vendor licence header ends up in this repository.
+
+QUARTUS_VERSION = "25.1"
+
+# Revisions
+
+PROJECT_REVISION = "counter"
