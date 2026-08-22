@@ -43,7 +43,7 @@ def canned(monkeypatch):
 
         def fake_run(image, workspace, argv, timeout=None):
             seen["argv"] = argv
-            return podman.Result(returncode, output, "")
+            return podman.Result(returncode, output)
 
         monkeypatch.setattr(lintmod.podman, "run", fake_run)
         return seen

@@ -25,18 +25,15 @@ class Result:
     """What one container run produced.
 
     @returncode: exit status of the command inside the container
-    @stdout: captured standard output
-    @stderr: captured standard error
+    @output: the run's transcript
+
+    The two streams are merged as the tool wrote them. HDL tools scatter
+    diagnostics across both, and a build log only makes sense in order, so
+    keeping them apart would cost more than it buys.
     """
 
     returncode: int
-    stdout: str
-    stderr: str
-
-    @property
-    def output(self) -> str:
-        """output - both streams joined, for tools that split diagnostics."""
-        return self.stdout + self.stderr
+    output: str
 
 
 def run(
@@ -77,7 +74,8 @@ def run(
     try:
         done = subprocess.run(
             command,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True,
             errors="replace",
             timeout=timeout,
@@ -87,6 +85,6 @@ def run(
         raise PodmanError("podman is not installed or not on PATH") from e
 
     if done.returncode == PODMAN_FAILURE:
-        raise PodmanError(f"podman could not start {image}: {done.stderr.strip()}")
+        raise PodmanError(f"podman could not start {image}: {done.stdout.strip()}")
 
-    return Result(done.returncode, done.stdout, done.stderr)
+    return Result(done.returncode, done.stdout)
