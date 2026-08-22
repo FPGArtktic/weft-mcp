@@ -27,6 +27,51 @@ WEFT is under construction, milestone by milestone. What is finished today:
 Both transports work: stdio for a local client, Streamable HTTP behind a
 static bearer token for a client on the LAN.
 
+## What this is for, if MCP is new to you
+
+Say a testbench fails and you want a model's help with it. Today you copy the
+file into a chat window, run Verilator yourself, paste a screenful of
+`%Warning-WIDTHEXPAND` after it, read the answer, apply the fix by hand, and go
+round again. The design is three files deep, so either you paste all three or
+the model guesses at the two you left out — and it will guess, confidently. The
+answer you get is about the text you pasted, which is not necessarily what is on
+disk.
+
+MCP, the Model Context Protocol, removes the ferrying. A server advertises a
+list of tools and the arguments each one takes. An LLM client — Claude Desktop,
+Claude Code, or anything else that speaks the protocol — puts that list in front
+of the model. You keep typing prose. The model picks a tool, fills in the
+arguments, and the client sends the call. WEFT is the server on the far end. It
+holds no model, runs no inference, and makes no network calls at runtime.
+
+When the model calls `lint`, WEFT resolves every path against your workspace
+root, refuses anything that escapes it, and runs roughly this:
+
+```bash
+podman run --rm --network=none -v <workspace>:/work -w /work weft-tools \
+    verilator --lint-only -Isrc src/updown_counter.sv
+```
+
+Verilator prints what it always prints. WEFT turns that into records — file,
+line, severity, message — and the container is gone. `simulate` is the same loop
+around Verilator, Icarus or GHDL, handing back pass/fail, a tail of the log and
+the path to the waveform.
+
+The boundary matters more than the plumbing: the model chooses what to attempt,
+WEFT chooses what may execute. There is no shell on the far end. The model
+cannot invent a flag, cannot reach a path you have not opened to it, and cannot
+run anything that is not on the list.
+
+The other reason to wrap the tools is size. A Quartus compile leaves megabytes
+of `.rpt` behind, and what you wanted from it was a resource line, an Fmax per
+clock domain, and the two warnings that mattered. Tool results here are a few
+kilobytes of JSON; the raw logs stay on disk and are fetched by name when
+something actually needs them.
+
+None of this designs anything. It will not write your RTL, close your timing, or
+know which board is on your desk. It runs the commands you would have run, and
+hands back something small enough to reason about.
+
 ## How it is put together
 
 Quartus runs **on the host** — WEFT drives the installation you already have
