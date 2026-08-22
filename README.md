@@ -24,7 +24,7 @@ WEFT is under construction, milestone by milestone. What is finished today:
 | Source indexing | working — `index_project`, `get_module_info`, `get_hierarchy`, `search_code` |
 | Document RAG with OCR | working — `index_document`, `search_docs`, `list_indexed_docs`; clause-level citations |
 | Documentation generation | working — `generate_docs`, `generate_module_doc`; Markdown and HTML, auto-indexed |
-| Device programming | not yet |
+| Device programming | not yet — and see *What has not been tested on hardware* below |
 
 Both transports work: stdio for a local client, Streamable HTTP behind a
 static bearer token for a client on the LAN.
@@ -359,6 +359,38 @@ are indexed for retrieval as they are written, under `doc_type: "generated"`.
 SystemVerilog, Verilog-2001 and VHDL at once. The three languages are the
 point: no open-source simulator reads more than one, so the project is a fair
 test of whether a tool really handles a mixed hierarchy or only claims to.
+
+## What has not been tested on hardware
+
+I have no FPGA board. Everything above was developed and verified against a
+real Quartus Prime 25.1 Lite installation and a real Questa - Altera Starter
+FPGA Edition, on real sources — the demonstration project compiles, fits,
+reports 177 logic elements and 154.23 MHz, and its testbenches run — but the
+bitstream has never been loaded into a device, because there is no device here
+to load it into.
+
+Concretely, that means:
+
+- **`program_device` and `list_devices` are unverified against hardware.** When
+  they land, what I can check is that WEFT reaches `quartus_pgm` and
+  `jtagconfig` with the right arguments and reports what they say, including
+  reporting an empty JTAG chain as empty rather than as an error. Whether a
+  board on the far end actually accepts the bitstream, I cannot tell you.
+- **The `.sof` and `.pof` a compilation of the demo project produces were
+  written by the assembler and never programmed.** They are evidence that the
+  flow completed, not that the design works on silicon. They are build output
+  and are not committed.
+- **Timing closure is reported, not proven.** WEFT reads back what the timing
+  analyser computed. Nothing here has been correlated with a scope.
+
+The parts that touch a board are also the parts that break in ways no unit
+test finds — a cable that enumerates differently, a JTAG chain with something
+unexpected on it, a device the `.pof` does not suit. If you run this against
+hardware and it misbehaves, that is a bug report I want, and I will not be
+able to reproduce it.
+
+Everything else — lint, simulate, compile, parse, index, retrieve, document —
+was run against the actual tools, not mocked, before it was called working.
 
 ## Contributing
 

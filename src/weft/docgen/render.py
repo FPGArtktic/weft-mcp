@@ -13,7 +13,7 @@ from typing import Any
 
 from .. import __version__
 from ..index.model import Module
-from ..quartus.reports import Reports
+from ..quartus.reports import Message, Reports
 from .constraints import Clock, Pin
 from .document import Block, Bullets, Diagram, Heading, Paragraph, Table
 
@@ -275,3 +275,242 @@ def _number(value: float | None) -> str:
     if float(value).is_integer():
         return str(int(value))
     return f"{value:g}"
+
+
+def compilation_doc(revision: str, reports: Reports) -> list[Block]:
+    """compilation_doc - what one compilation produced, developer first
+
+    @revision: revision name, for the title
+    @reports: the parsed reports
+
+    A separate document from the project reference on purpose. The reference
+    changes when the design changes; this changes every time the flow runs,
+    and a build worth keeping is a build whose report can be kept beside it.
+
+    It opens with the three things a developer wants before anything else --
+    did it build, did timing close, what should be looked at -- because a
+    summary that leads with a resource table makes those three the reader's
+    job to work out. Everything else is below, in the order it is usually
+    needed.
+
+    Return: the blocks of the document.
+    """
+    return [
+        Heading(1, f"{revision} — compilation"),
+        Paragraph(PROVENANCE),
+        *_verdict(reports),
+        *_attention(reports),
+        *_resources(reports),
+        *_timing_detail(reports),
+        *_other_messages(reports),
+        *_provenance(reports),
+    ]
+
+
+def _verdict(reports: Reports) -> list[Block]:
+    """_verdict - the answer, before the evidence.
+
+    One line a reader can stop at, and a table for the numbers behind it.
+    """
+    closed = [t for t in reports.timing if t.met]
+    peak = max(
+        (u.percent for u in reports.resources.values() if u.percent is not None), default=None
+    )
+
+    said = [f"Status: {reports.status}." if reports.status else "The flow reported no status."]
+    if reports.timing:
+        said.append(
+            f"Timing met on {len(closed)} of {len(reports.timing)} "
+            f"clock{'s' if len(reports.timing) != 1 else ''}."
+        )
+    else:
+        said.append("No timing analysis was found.")
+    said.append(_severity_phrase(reports))
+
+    rows = [
+        ["Device", reports.device or ""],
+        ["Top entity", reports.top_entity or ""],
+    ]
+    if peak is not None:
+        rows.append(["Fullest resource", f"{_number(peak)} %"])
+    if reports.timing:
+        rows.append(["Worst slack", _worst_slack(reports)])
+        rows.append(["Lowest Fmax", _fmax_floor(reports)])
+    rows.append(["Messages", _message_tally(reports)])
+
+    return [Heading(2, "Verdict"), Paragraph(" ".join(said)), Table(["", ""], rows)]
+
+
+def _errors(reports: Reports) -> list[Message]:
+    """_errors - messages Quartus called an error."""
+    return [m for m in reports.messages if "error" in m.severity.lower()]
+
+
+def _critical(reports: Reports) -> list[Message]:
+    """_critical - messages Quartus called a critical warning."""
+    return [m for m in reports.messages if "critical" in m.severity.lower()]
+
+
+def _severity_phrase(reports: Reports) -> str:
+    """_severity_phrase - what rose above an ordinary warning, named correctly
+
+    Errors and critical warnings are not the same thing and must not be
+    counted together: a build with two critical warnings and no errors is a
+    build that succeeded, and saying "2 errors" about it is simply false.
+    """
+    errors, critical = len(_errors(reports)), len(_critical(reports))
+    parts = []
+    if errors:
+        parts.append(f"{errors} error{'s' if errors != 1 else ''}")
+    if critical:
+        parts.append(f"{critical} critical warning{'s' if critical != 1 else ''}")
+    if not parts:
+        return "Nothing rose above an ordinary warning."
+    return f"{' and '.join(parts)} to look at."
+
+
+def _message_tally(reports: Reports) -> str:
+    """_message_tally - the message counts, broken out by what they are."""
+    errors, critical = len(_errors(reports)), len(_critical(reports))
+    return f"{reports.message_count} total, {errors} error, {critical} critical"
+
+
+def _worst_slack(reports: Reports) -> str:
+    """_worst_slack - the tightest slack, and which check it belongs to
+
+    Naming the check matters. The smallest number is often hold, and a reader
+    shown a bare "0.144 ns" reads it as setup and concludes the design is
+    nearly out of speed when it is nowhere near.
+    """
+    found = [
+        (slack, check, timing.clock)
+        for timing in reports.timing
+        for check, slack in timing.slack.items()
+    ]
+    if not found:
+        return ""
+    slack, check, clock = min(found)
+    return f"{_number(slack)} ns ({check}, {clock})"
+
+
+def _fmax_floor(reports: Reports) -> str:
+    """_fmax_floor - the slowest clock's Fmax, which is the design's ceiling."""
+    found = [t.fmax_mhz for t in reports.timing if t.fmax_mhz is not None]
+    if not found:
+        return ""
+    slowest = min(found)
+    clock = next(t.clock for t in reports.timing if t.fmax_mhz == slowest)
+    return f"{_number(slowest)} MHz ({clock})"
+
+
+def _attention(reports: Reports) -> list[Block]:
+    """_attention - errors and critical warnings, on their own
+
+    Kept apart from the ordinary warnings because they do not belong in the
+    same list: a compilation prints boilerplate about thermal models and
+    licence features every single time, and burying two critical warnings in
+    six lines of it is how they get missed.
+    """
+    serious = [m for m in reports.messages if _serious(m)]
+    if not serious:
+        return [Heading(2, "Needs attention"), Paragraph("No errors and no critical warnings.")]
+
+    return [
+        Heading(2, "Needs attention"),
+        Table(
+            ["Severity", "ID", "Message", "Report"],
+            [[m.severity, m.code, m.text, m.source] for m in serious],
+        ),
+    ]
+
+
+def _serious(message: Message) -> bool:
+    """_serious - whether a message is one a developer has to read."""
+    return "error" in message.severity.lower() or "critical" in message.severity.lower()
+
+
+def _resources(reports: Reports) -> list[Block]:
+    """_resources - the resource lines, as the fitter counted them."""
+    if not reports.resources:
+        return []
+    return [
+        Heading(2, "Resources"),
+        Table(
+            ["Resource", "Used", "Available", "%"],
+            [
+                [
+                    name,
+                    str(usage.used),
+                    "" if usage.available is None else str(usage.available),
+                    _number(usage.percent),
+                ]
+                for name, usage in reports.resources.items()
+            ],
+        ),
+    ]
+
+
+def _timing_detail(reports: Reports) -> list[Block]:
+    """_timing_detail - every check of every clock, not just the worst one
+
+    The project reference shows the worst slack per clock, which answers "did
+    it close". This answers "where is it tight", which is the question asked
+    next, and the two are not the same number: a clock can meet setup
+    comfortably and fail recovery.
+    """
+    if not reports.timing:
+        return []
+
+    checks = sorted({c for t in reports.timing for c in t.slack})
+    rows = []
+    for timing in reports.timing:
+        row = [timing.clock, _number(timing.fmax_mhz), _number(timing.restricted_fmax_mhz)]
+        for check in checks:
+            slack = timing.slack.get(check)
+            row.append("" if slack is None else f"{slack:g} / {_number(timing.tns.get(check))}")
+        row.append("yes" if timing.met else "no")
+        rows.append(row)
+
+    header = ["Clock", "Fmax (MHz)", "Restricted (MHz)"]
+    header += [f"{check}: slack / TNS (ns)" for check in checks]
+    header += ["Met"]
+    return [Heading(2, "Timing"), Table(header, rows)]
+
+
+def _other_messages(reports: Reports) -> list[Block]:
+    """_other_messages - the ordinary warnings, below the ones that matter."""
+    ordinary = [m for m in reports.messages if not _serious(m)]
+    if not ordinary:
+        return []
+
+    blocks: list[Block] = [Heading(2, "Other warnings")]
+    hidden = reports.message_count - len(reports.messages)
+    if hidden > 0:
+        blocks.append(
+            Paragraph(
+                f"{reports.message_count} messages in total; {hidden} are not listed here. "
+                "The full text is in the reports on disk."
+            )
+        )
+    blocks.append(
+        Table(
+            ["Severity", "ID", "Message", "Report"],
+            [[m.severity, m.code, m.text, m.source] for m in ordinary],
+        )
+    )
+    return blocks
+
+
+def _provenance(reports: Reports) -> list[Block]:
+    """_provenance - which report files these figures were read out of."""
+    if not reports.files:
+        return []
+    return [
+        Heading(2, "Sources"),
+        Bullets([f"`{name}`" for name in sorted(reports.files)]),
+        Paragraph(
+            f"Compiled with Quartus {reports.quartus_version}."
+            if reports.quartus_version
+            else "The reports do not name a Quartus version."
+        ),
+    ]

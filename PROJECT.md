@@ -191,7 +191,7 @@ The same structure applies to VHDL entities using `--` comments. `generate_docs`
 | M3 | AST indexing (Verible, GHDL), `index_project`, `search_code`, `get_module_info`, `get_hierarchy` | Correct hierarchy and port tables for the demo project |
 | M4 | RAG: `index_document` (PDF + OCR), `search_docs` with clause-aware chunking for IEEE standards | Query returns correct clause citation from a user-supplied 1800-2023 PDF |
 | M5 | `generate_docs`, `generate_module_doc`; generated docs auto-indexed | Docs for demo project render with hierarchy diagram and pin map |
-| M6 | Pro-edition support (paths + FlexLM env), `list_devices`, `program_device`, Streamable HTTP + token | Demo bitstream programmed onto a board via MCP |
+| M6 | Pro-edition support (paths + FlexLM env), `list_devices`, `program_device`, Streamable HTTP + token | `quartus_pgm` and `jtagconfig` reached with the right arguments and their output reported, an empty JTAG chain reported as empty rather than as an error. **The board step cannot be verified here** — there is no hardware on this desk, and the hardware path lives in `tests/manual/`. |
 
 ## Appendix A — Air-gapped deployment (DevOps hand-off; out of scope)
 - Client model: Kimi K2 on **32× NVIDIA H100 80 GB** — 2.56 TB of aggregate HBM. That is enough for the FP8 variant (~1 TB of weights) with the rest left for KV cache, which removes the constraint that shaped the earlier 8-GPU sizing: INT4 (~594 GB) is no longer the only variant that fits, and long contexts and real concurrency stop competing with the weights for memory. Sizing at this scale is a tensor/pipeline-parallel layout question rather than a fit question, and belongs with whoever owns the cluster.

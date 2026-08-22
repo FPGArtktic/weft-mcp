@@ -106,23 +106,43 @@ in VHDL and Verilator cannot see it. Linting each module on its own is clean.
 
 ## The `docs/` directory
 
-`docs/counter.md` and `docs/debouncer.md` are committed **generated output**,
-not hand-written documentation. They are exactly what these two calls produce
-against this project, with a workspace root one level up:
+Everything in `docs/` is committed **generated output**, not hand-written
+documentation. It is exactly what an MCP client gets from these calls against
+this project, with the workspace root one level up:
 
 ```jsonc
-generate_docs       { "project_ref": "counter" }
-generate_module_doc { "module": "debouncer", "project_ref": "counter" }
+index_project           { "directory": "counter" }
+generate_docs           { "project_ref": "counter" }
+generate_compilation_doc{ "project_ref": "counter" }
+generate_module_doc     { "module": "counter_top", "project_ref": "counter" }
+// ... once per module
 ```
 
-Every number in them was computed: the port tables and the hierarchy come from
-the Verible and GHDL parse trees, the per-port descriptions from the kernel-doc
-headers in the sources, the pin map from the fitter's `.pin` report, and the
-177 logic elements and 154.23 MHz Fmax from a real Quartus 25.1 compilation of
-this project. Nothing in them is prose about what a module is *for* — that is
-the client model's job, and the generator does not guess.
+That is a project reference, a compilation summary, and a page for each of the
+eight modules, testbenches included.
 
-They carry no timestamp, so regenerating them produces no diff unless the
-design actually changed. `generate_docs` also writes HTML, with the hierarchy
-as inline SVG rather than Mermaid, because a browser draws no Mermaid and an
-offline server may not fetch a renderer; that output is not committed here.
+`counter-compilation.md` is the one to read after a build. It opens with the
+three things worth knowing before any table — did it build, did timing close,
+what needs attention — and keeps the two critical warnings apart from the four
+routine ones, because Quartus prints the routine ones every single time and
+burying the real ones among them is how they get missed. It names the check
+each slack belongs to, too: the smallest number here is 0.144 ns of *hold*
+slack, and a reader shown that bare would take it for setup and conclude the
+design is out of speed when it runs at 154 MHz.
+
+Every number in them was computed. The port tables and the hierarchy come from
+the Verible and GHDL parse trees; the per-port descriptions from the kernel-doc
+headers in the sources; the pin map from the fitter's `.pin` report; the 177
+logic elements and 154.23 MHz Fmax from a real Quartus 25.1 compilation of this
+project. Nothing in them is prose about what a module is *for* — that is the
+client model's job, and the generator does not guess. A port whose header line
+is missing gets a dash.
+
+Paths inside them, such as `counter/src/counter_top.sv:24`, are relative to the
+workspace root rather than to this directory, because that is what every WEFT
+tool takes and returns. Hand one back to `get_module_info` and it works.
+
+They carry no timestamp, so regenerating produces no diff unless the design
+actually changed. `generate_docs` also writes HTML, with the hierarchy as
+inline SVG rather than Mermaid — a browser draws no Mermaid and an offline
+server may not fetch a renderer — but that output is not committed here.

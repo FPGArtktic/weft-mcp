@@ -674,6 +674,39 @@ def build(config: Config) -> MCPServer:
 
     @server.tool(
         description=(
+            "Generate a compilation summary: whether it built, whether timing "
+            "closed, and what needs attention. Errors and critical warnings are "
+            "listed apart from the routine ones, because a compilation prints "
+            "the routine ones every time. Indexed for retrieval."
+        )
+    )
+    def generate_compilation_doc(
+        project_ref: str, format: str = document.MARKDOWN
+    ) -> dict[str, Any]:
+        """generate_compilation_doc - a summary of the last compilation
+
+        @project_ref: workspace-relative .qpf path, or the project name
+        @format: "markdown" or "html"
+
+        Separate from the project reference because the two change at
+        different times: the reference when the design changes, this every
+        time the flow runs.
+
+        Return: where it was written, or a marker saying nothing was compiled.
+
+        Raises SandboxError if @project_ref escapes the workspace, ValueError
+        for an unknown format.
+        """
+        directory, revision = located(project_ref)
+        parsed = _reports_or_none(directory, revision)
+        if parsed is None:
+            return {"project": revision, "compiled": False}
+
+        blocks = render.compilation_doc(revision, parsed)
+        return keep(blocks, format, directory, f"{revision}-compilation", f"{revision} compilation")
+
+    @server.tool(
+        description=(
             "Generate one module's reference page from the index: ports, "
             "parameters, instances, and the header its author wrote. Facts only."
         )
