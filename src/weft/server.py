@@ -20,12 +20,50 @@ from . import __version__
 from .config import Config, load
 from .fastloop.lint import lint as run_lint
 from .fastloop.simulate import simulate as run_simulate
+from .jobs import JobStore
+from .quartus import flow, project, reports
+from .quartus.install import Install, InstallError, probe
+from .sandbox import resolve
 
 #: A tool result stays small enough for a client to read without paging.
 MAX_DIAGNOSTICS = 100
 
+#: Default number of log lines get_job_log hands back.
+DEFAULT_LOG_TAIL = 100
+
 CONFIG_ENV = "WEFT_CONFIG"
 DEFAULT_CONFIG = Path("~/.config/weft/weft.toml")
+
+
+class Installs:
+    """The Quartus installations named in the configuration.
+
+    Probing runs quartus_sh, which takes about a second, so each edition is
+    identified once and remembered. Probing lazily also lets a machine with no
+    Quartus start the server and use the fast loop.
+    """
+
+    def __init__(self, config: Config):
+        self._config = config
+        self._known: dict[str, Install] = {}
+
+    def get(self, edition: str | None = None) -> Install:
+        """get - the installation for @edition, or the configured default
+
+        Raises InstallError when no edition is configured, or when the one
+        asked for is not.
+        """
+        name = edition or self._config.edition
+        if name is None:
+            raise InstallError(
+                "no Quartus edition configured; set quartus.edition, or configure exactly one"
+            )
+        if name not in self._known:
+            entry = self._config.quartus.get(name)
+            if entry is None:
+                raise InstallError(f"no [quartus.{name}] section in the configuration")
+            self._known[name] = probe(entry.root, entry.env)
+        return self._known[name]
 
 
 class StaticTokenVerifier:
@@ -123,6 +161,190 @@ def build(config: Config) -> MCPServer:
             timeout=config.job_timeout_s,
         )
         return asdict(result)
+
+    installs = Installs(config)
+    store = JobStore(config.jobs_db)
+
+    def located(name: str) -> tuple[Path, str]:
+        """located - the directory and revision behind a project reference
+
+        @name: workspace-relative path to a .qpf, as list_projects returns
+               them, or the bare project name
+
+        Return: the resolved directory and the revision name.
+        """
+        reference = name if name.endswith(".qpf") else f"{name}/{name}.qpf"
+        qpf = resolve(config.workspace, reference)
+        return qpf.parent, qpf.stem
+
+    @server.tool(
+        description=(
+            "Create a Quartus project: writes the .qpf and .qsf under a directory "
+            "of the same name in the workspace."
+        )
+    )
+    def create_project(
+        name: str,
+        family: str,
+        part: str,
+        top: str | None = None,
+        edition: str | None = None,
+        overwrite: bool = False,
+    ) -> dict[str, Any]:
+        """create_project - write a fresh project
+
+        @name: project and revision name
+        @family: device family, e.g. "MAX 10"
+        @part: device part number
+        @top: top-level entity; defaults to @name
+        @edition: which configured Quartus to use; defaults to the configured one
+        @overwrite: replace an existing project of the same name
+
+        Return: the project path, relative to the workspace.
+        """
+        directory = resolve(config.workspace, name)
+        qpf = project.create_project(
+            installs.get(edition), directory, name, family, part, top=top, overwrite=overwrite
+        )
+        return {"project": str(qpf.relative_to(config.workspace)), "revision": name}
+
+    @server.tool(
+        description=(
+            "Apply assignments to a project. Each assignment is "
+            '{"kind": "global"|"location"|"instance"|"parameter", "name", "value", "to"}; '
+            "a location carries its pin in value, and only a global needs no target."
+        )
+    )
+    def set_assignments(
+        project_ref: str,
+        assignments: list[dict[str, str]],
+        edition: str | None = None,
+    ) -> dict[str, Any]:
+        """set_assignments - edit a project's .qsf through the Tcl API
+
+        @project_ref: workspace-relative .qpf path, or the project name
+        @assignments: the assignments to apply, in order
+        @edition: which configured Quartus to use
+
+        Return: the rewritten .qsf, relative to the workspace.
+        """
+        directory, revision = located(project_ref)
+        wanted = [
+            project.Assignment(
+                kind=a.get("kind", ""),
+                value=a.get("value", ""),
+                name=a.get("name", ""),
+                to=a.get("to", ""),
+            )
+            for a in assignments
+        ]
+        qsf = project.set_assignments(installs.get(edition), directory, revision, wanted)
+        return {"qsf": str(qsf.relative_to(config.workspace)), "applied": len(wanted)}
+
+    @server.tool(description="List the Quartus projects in the workspace.")
+    def list_projects() -> dict[str, Any]:
+        """list_projects - every .qpf under the workspace root."""
+        found = project.list_projects(config.workspace)
+        return {"count": len(found), "projects": found}
+
+    @server.tool(
+        description=(
+            "What a project is set up to build: device, top entity, and its sources "
+            "grouped by language. Read from the .qsf, so it needs no Quartus."
+        )
+    )
+    def get_project_info(project_ref: str) -> dict[str, Any]:
+        """get_project_info - a project's device, top entity and sources
+
+        @project_ref: workspace-relative .qpf path, or the project name
+
+        Return: the assignments that describe what the project builds.
+        """
+        directory, revision = located(project_ref)
+        return project.project_info(directory, revision)
+
+    @server.tool(
+        description=(
+            "Start a compilation as a background job. Stage is full, syn, fit, asm or sta. "
+            "Returns a job_id; poll it with get_job_status."
+        )
+    )
+    def start_compile(
+        project_ref: str, stage: str = flow.FULL, edition: str | None = None
+    ) -> dict[str, Any]:
+        """start_compile - run a stage, or the whole flow, in the background
+
+        @project_ref: workspace-relative .qpf path, or the project name
+        @stage: "full", "syn", "fit", "asm" or "sta"
+        @edition: which configured Quartus to use
+
+        Return: the job id and what it is running.
+        """
+        directory, revision = located(project_ref)
+        job = flow.start_compile(store, installs.get(edition), directory, revision, stage=stage)
+        return {"job_id": job.id, "revision": revision, "stage": stage, "status": job.status}
+
+    @server.tool(description="Status of a compilation job, reconciled against the real process.")
+    def get_job_status(job_id: str) -> dict[str, Any]:
+        """get_job_status - where a job has got to
+
+        @job_id: identifier from start_compile
+
+        Return: status, exit code, the phase reached, and timestamps.
+        """
+        job = store.get(job_id)
+        return {
+            "job_id": job.id,
+            "status": job.status,
+            "stage": job.flow,
+            "progress": flow.progress(job),
+            "exit_code": job.exit_code,
+            "revision": job.revision,
+            "created_at": job.created_at,
+            "finished_at": job.finished_at,
+        }
+
+    @server.tool(description="Tail of a compilation job's log.")
+    def get_job_log(job_id: str, tail: int = DEFAULT_LOG_TAIL) -> dict[str, Any]:
+        """get_job_log - the end of the log a job is writing
+
+        @job_id: identifier from start_compile
+        @tail: how many trailing lines to return
+
+        Return: the lines, and how many the log holds in total.
+        """
+        job = store.get(job_id)
+        try:
+            lines = Path(job.log_path).read_text(errors="replace").splitlines()
+        except OSError:
+            return {"job_id": job.id, "total_lines": 0, "lines": []}
+        return {
+            "job_id": job.id,
+            "total_lines": len(lines),
+            "lines": lines[-max(tail, 0) :],
+        }
+
+    @server.tool(description="Ask a running compilation to stop.")
+    def cancel_job(job_id: str) -> dict[str, Any]:
+        """cancel_job - signal a job and report what it became."""
+        job = store.cancel(job_id)
+        return {"job_id": job.id, "status": job.status}
+
+    @server.tool(
+        description=(
+            "Parse a finished compilation's reports into resources, timing per clock "
+            "domain, and the warnings and errors, worst first."
+        )
+    )
+    def parse_reports(project_ref: str) -> dict[str, Any]:
+        """parse_reports - what the last compilation produced
+
+        @project_ref: workspace-relative .qpf path, or the project name
+
+        Return: the parsed reports; raw logs stay on disk.
+        """
+        directory, revision = located(project_ref)
+        return asdict(reports.parse_reports(directory, revision))
 
     return server
 
