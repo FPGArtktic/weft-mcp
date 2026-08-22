@@ -103,3 +103,26 @@ the result.
 One thing to expect from `lint`: linting `counter_top.sv` reports
 `MODMISSING` for `seven_seg_decoder`. The module is not missing, it is written
 in VHDL and Verilator cannot see it. Linting each module on its own is clean.
+
+## The `docs/` directory
+
+`docs/counter.md` and `docs/debouncer.md` are committed **generated output**,
+not hand-written documentation. They are exactly what these two calls produce
+against this project, with a workspace root one level up:
+
+```jsonc
+generate_docs       { "project_ref": "counter" }
+generate_module_doc { "module": "debouncer", "project_ref": "counter" }
+```
+
+Every number in them was computed: the port tables and the hierarchy come from
+the Verible and GHDL parse trees, the per-port descriptions from the kernel-doc
+headers in the sources, the pin map from the fitter's `.pin` report, and the
+177 logic elements and 154.23 MHz Fmax from a real Quartus 25.1 compilation of
+this project. Nothing in them is prose about what a module is *for* — that is
+the client model's job, and the generator does not guess.
+
+They carry no timestamp, so regenerating them produces no diff unless the
+design actually changed. `generate_docs` also writes HTML, with the hierarchy
+as inline SVG rather than Mermaid, because a browser draws no Mermaid and an
+offline server may not fetch a renderer; that output is not committed here.
