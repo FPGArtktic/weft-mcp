@@ -13,10 +13,10 @@ import pytest
 
 from weft.jobs import (
     CANCELLED,
+    DONE,
     FAILED,
     LOST,
     RUNNING,
-    DONE,
     JobError,
     JobStore,
 )
