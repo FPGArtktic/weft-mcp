@@ -5,6 +5,16 @@
 ```{rubric} WEFT Elaborates FPGA Toolchains
 ```
 
+:::{container} badges
+[![ci](https://github.com/FPGArtktic/weft-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/FPGArtktic/weft-mcp/actions/workflows/ci.yml)
+[![container](https://github.com/FPGArtktic/weft-mcp/actions/workflows/container.yml/badge.svg)](https://github.com/FPGArtktic/weft-mcp/actions/workflows/container.yml)
+[![docs](https://readthedocs.org/projects/weft-mcp/badge/?version=main)](https://weft-mcp.readthedocs.io/en/main/)
+[![python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](https://github.com/FPGArtktic/weft-mcp/blob/main/pyproject.toml)
+[![latest tag](https://img.shields.io/github/v/tag/FPGArtktic/weft-mcp)](https://github.com/FPGArtktic/weft-mcp/tags)
+[![licence: GPL-3.0-only](https://img.shields.io/badge/licence-GPL--3.0--only-blue.svg)](https://github.com/FPGArtktic/weft-mcp/blob/main/COPYING)
+[![Contributor Covenant 2.1](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](https://github.com/FPGArtktic/weft-mcp/blob/main/CODE_OF_CONDUCT.md)
+:::
+
 An MCP server that gives an LLM client a structured interface to an Intel
 Quartus Prime FPGA flow: lint and simulate in seconds, compile asynchronously,
 search your own standards, and read results back as JSON instead of megabytes

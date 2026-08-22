@@ -37,3 +37,19 @@ section > h2 {
     font-weight: 600;
     margin-bottom: 0.35rem;
 }
+
+/* The badge row under the title. The images are separate links, so without a
+   flex row they inherit the paragraph's line height and sit at uneven
+   baselines; a gap is also the only thing keeping them apart at all. */
+.badges p {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 1.5rem;
+}
+
+.badges img {
+    height: 20px;
+    vertical-align: middle;
+}
