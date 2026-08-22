@@ -3,7 +3,7 @@
 
 from weft.docgen.constraints import Clock, Pin
 from weft.docgen.document import MARKDOWN, render
-from weft.docgen.render import NOT_COMPILED, Project, module_doc, project_doc
+from weft.docgen.render import NOT_COMPILED, PROVENANCE, Project, module_doc, project_doc
 from weft.index.model import SYSTEMVERILOG, VHDL, Instance, Module, Parameter, Port
 from weft.quartus.reports import ClockTiming, Reports, Usage
 
@@ -128,3 +128,14 @@ def test_the_hierarchy_is_drawn_when_the_top_is_indexed():
 
 def test_no_hierarchy_section_without_a_top():
     assert "## Hierarchy" not in text(project_doc(Project(name="counter")))
+
+
+def test_a_generated_document_says_that_it_is_generated():
+    """Hand edits are lost on the next run; the file has to say so itself."""
+    assert PROVENANCE in text(module_doc(documented()))
+    assert PROVENANCE in text(project_doc(Project(name="counter")))
+
+
+def test_a_generated_document_carries_no_timestamp():
+    """A file that changes on every run cannot be diffed or committed."""
+    assert text(project_doc(Project(name="counter"))) == text(project_doc(Project(name="counter")))
