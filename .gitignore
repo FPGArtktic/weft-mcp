@@ -1,0 +1,17 @@
+CLAUDE.md
+.specstory
+PROJECT.md
+
+# build / runtime artifacts
+__pycache__/
+*.py[cod]
+.venv/
+dist/
+build/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# workspace + RAG stores (never committed)
+*.sqlite
+*.sqlite-*

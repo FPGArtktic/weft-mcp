@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: GPL-2.0-only
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "weft"
+version = "0.1.0"
+description = "WEFT Elaborates FPGA Toolchains - an MCP server for the Intel Quartus Prime flow"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "GPL-2.0-only"
+authors = [{ name = "Mateusz Okulanis", email = "FPGArtktic@outlook.com" }]
+
+# mcp is the official MCP Python SDK (FastMCP); MIT, so GPL-2.0-only compatible.
+dependencies = ["mcp>=2.0.0"]
+
+[project.scripts]
+weft = "weft.server:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RET"]
