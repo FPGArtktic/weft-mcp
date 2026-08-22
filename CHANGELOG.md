@@ -13,6 +13,10 @@ the summary you can read in a minute.
 
 ## Unreleased
 
+Nothing yet.
+
+## [0.2.0] — 2026-08-22
+
 Milestone 2 — Quartus compilation as persistent jobs.
 
 ### Added
@@ -33,10 +37,20 @@ Milestone 2 — Quartus compilation as persistent jobs.
   assignment forms are supported, `set_parameter` included. Client-supplied
   values are brace quoted, and a value carrying braces or a backslash is
   refused rather than escaped.
+- `quartus`: `parse_reports`, folding timing to the worst corner and returning
+  a few kilobytes of JSON in place of megabytes of `.rpt`. Reports are looked
+  for wherever `PROJECT_OUTPUT_DIRECTORY` says, not in an assumed directory.
+- `quartus`: `get_project_info`, read straight from the `.qsf` so it needs no
+  Quartus and no second of Tcl startup.
 - `quartus`: installation probe. Edition comes from the version banner, not
   from which binaries are present: a Lite installation ships the Pro-only
   `quartus_syn` as a stub that refuses to run, so testing for the file would
   misidentify it.
+
+### Fixed
+
+- `jobs`: the store opened one SQLite connection at startup, which the MCP
+  server's worker thread could not use. Connections are per thread now.
 
 ## [0.1.0] — 2026-08-22
 
@@ -60,4 +74,5 @@ Milestone 1 — the fast loop.
 - `Documentation`: the counter demonstration project, written in
   SystemVerilog, Verilog-2001 and VHDL at once.
 
+[0.2.0]: https://github.com/FPGArtktic/weft-mcp/releases/tag/v0.2.0
 [0.1.0]: https://github.com/FPGArtktic/weft-mcp/releases/tag/v0.1.0

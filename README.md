@@ -18,7 +18,9 @@ WEFT is under construction, milestone by milestone. What is finished today:
 |---|---|
 | `lint` | working — Verilator for Verilog and SystemVerilog, GHDL for VHDL |
 | `simulate` | working — Verilator, Icarus or GHDL, with waveform capture |
-| Quartus compilation, jobs, `parse_reports` | not yet |
+| Quartus projects | working — `create_project`, `set_assignments`, `get_project_info`, `list_projects` |
+| Quartus compilation | working — `start_compile` as a persistent job, `get_job_status`, `get_job_log`, `cancel_job` |
+| `parse_reports` | working — resources, timing per clock, ranked messages |
 | Source indexing, `search_code`, `get_hierarchy` | not yet |
 | Document RAG with OCR | not yet |
 | Documentation generation | not yet |
@@ -86,8 +88,8 @@ inside the container alike.
 
 Nothing reaches the network at runtime, and nothing reports telemetry.
 
-The full design — every tool's arguments and return shape, the milestones, and the reasoning behind the awkward parts — is in
-[PROJECT.md](PROJECT.md).
+The full design — every tool's arguments and return shape, the milestones,
+and the reasoning behind the awkward parts — is in [PROJECT.md](PROJECT.md).
 
 ## Requirements
 
