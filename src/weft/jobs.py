@@ -15,6 +15,7 @@ import os
 import signal
 import sqlite3
 import subprocess
+import threading
 import time
 import uuid
 from dataclasses import dataclass
@@ -72,7 +73,7 @@ class Job:
     @revision: Quartus revision name
     @flow: flow name, for instance "compile"
     @log_path: file collecting the tool's output
-    @status: running, succeeded, failed, cancelled or lost
+    @status: running, done, failed, cancelled or lost
     @exit_code: the tool's exit status, once it has one
     @pid: process id while running
     @created_at / @finished_at: seconds since the epoch
@@ -99,6 +100,12 @@ class JobStore:
 
     Every read reconciles first, so a caller never sees a job reported as
     running when its process is gone.
+
+    Connections are per thread. A SQLite connection may only be used by the
+    thread that opened it, and the MCP server runs synchronous tools in a
+    worker thread, so a single shared connection made at startup would be
+    unusable by every tool call. Write-ahead logging lets the connections
+    share the file without blocking each other.
     """
 
     def __init__(self, database: Path):
@@ -106,16 +113,32 @@ class JobStore:
 
         @database: SQLite file; parent directories are created as needed
         """
-        database = Path(database)
-        database.parent.mkdir(parents=True, exist_ok=True)
-        self._db = sqlite3.connect(database, isolation_level=None)
-        self._db.row_factory = sqlite3.Row
-        self._db.execute("PRAGMA journal_mode=WAL")
+        self._database = Path(database)
+        self._database.parent.mkdir(parents=True, exist_ok=True)
+        self._local = threading.local()
         self._db.executescript(SCHEMA)
 
+    @property
+    def _db(self) -> sqlite3.Connection:
+        """_db - this thread's connection, opened on first use."""
+        connection = getattr(self._local, "connection", None)
+        if connection is None:
+            connection = sqlite3.connect(self._database, isolation_level=None)
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA journal_mode=WAL")
+            self._local.connection = connection
+        return connection
+
     def close(self) -> None:
-        """close - release the database handle."""
-        self._db.close()
+        """close - release this thread's handle.
+
+        Connections opened by other threads are left to be collected when
+        those threads end; SQLite will not let one thread close another's.
+        """
+        connection = getattr(self._local, "connection", None)
+        if connection is not None:
+            connection.close()
+            self._local.connection = None
 
     def start(
         self,
