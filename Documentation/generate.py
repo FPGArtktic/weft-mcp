@@ -22,12 +22,58 @@ def write(directory: Path) -> None:
     (directory / "configuration.md").write_text(HEADER + _configuration())
 
 
+#: The tools, grouped the way somebody looks for them. A flat list of twenty
+#: alphabetical entries is a list nobody reads; the groups are the subsystems
+#: of the source tree, so the page and the code agree about what belongs where.
+GROUPS: list[tuple[str, str, tuple[str, ...]]] = [
+    (
+        "Fast loop",
+        "Checking and running HDL without involving Quartus. Seconds, not minutes.",
+        ("lint", "simulate"),
+    ),
+    (
+        "Projects",
+        "Creating and inspecting Quartus projects. Assignments go through the "
+        "`::quartus::project` Tcl API rather than by writing `.qsf` text.",
+        ("create_project", "set_assignments", "list_projects", "get_project_info"),
+    ),
+    (
+        "Compilation",
+        "Quartus runs as a persistent job. Job state lives in SQLite, so a "
+        "compilation survives the server being restarted underneath it.",
+        ("start_compile", "get_job_status", "get_job_log", "cancel_job", "parse_reports"),
+    ),
+    (
+        "Source index",
+        "Symbols from real parsers -- Verible for Verilog and SystemVerilog, "
+        "GHDL for VHDL. On demand only: no watcher, no automatic triggers.",
+        ("index_project", "search_code", "get_module_info", "get_hierarchy"),
+    ),
+    (
+        "Documents",
+        "Your own PDFs. OCR runs only on pages that have no text layer, and a "
+        "document is cut at its own clause headings so a result can be cited.",
+        ("index_document", "search_docs", "list_indexed_docs"),
+    ),
+    (
+        "Generated documentation",
+        "Facts computed from syntax trees, constraints and reports. Prose is "
+        "the client model's job; nothing here invents a description.",
+        ("generate_docs", "generate_module_doc", "generate_compilation_doc"),
+    ),
+]
+
+
 def _tools() -> str:
     """_tools - the reference for every tool the server registers.
 
     The server is built against a throwaway workspace, because building it is
     the only way to ask it what it exposes -- the tools are registered by
     decorators inside build(), not listed anywhere a parser could read.
+
+    A tool that exists and belongs to no group still appears, under a heading
+    that says so. Silently dropping it would make the page look complete when
+    it is not.
     """
     from weft.config import Config, Http
     from weft.server import build
@@ -49,20 +95,47 @@ def _tools() -> str:
         )
         found = asyncio.run(build(config).list_tools())
 
+    by_name = {t.name: t for t in found}
+    grouped = [n for _, _, names in GROUPS for n in names]
+    ungrouped = sorted(set(by_name) - set(grouped))
+
     lines = [
         "# Tools",
         "",
-        "Every tool the server exposes, as an MCP client sees it. Paths in",
-        "arguments are relative to the configured workspace root, and anything",
-        "resolving outside it is refused.",
+        f"All {len(by_name)} of them, as an MCP client sees them. Paths in arguments",
+        "are relative to the configured workspace root; anything resolving outside",
+        "it is refused, symlinks resolved first.",
+        "",
+        ":::{note}",
+        "You do not call these by hand. The client puts the list in front of the",
+        "model, you type ordinary sentences, and the model fills in the arguments.",
+        "This page is for reading when you want to know what it *could* do.",
+        ":::",
         "",
     ]
-    for tool in sorted(found, key=lambda t: t.name):
-        lines += [f"## `{tool.name}`", "", (tool.description or "").strip(), ""]
-        arguments = _arguments(tool)
-        if arguments:
-            lines += ["| Argument | Type | Required |", "|---|---|---|", *arguments, ""]
+
+    sections = [*GROUPS]
+    if ungrouped:
+        sections.append(("Other", "Registered but not yet grouped on this page.", tuple(ungrouped)))
+
+    for title, blurb, names in sections:
+        present = [n for n in names if n in by_name]
+        if not present:
+            continue
+        lines += [f"## {title}", "", blurb, ""]
+        for name in present:
+            lines += _tool_entry(by_name[name])
+
     return "\n".join(lines) + "\n"
+
+
+def _tool_entry(tool: object) -> list[str]:
+    """_tool_entry - one tool's heading, description and argument table."""
+    lines = [f"### `{tool.name}`", "", (tool.description or "").strip(), ""]
+    arguments = _arguments(tool)
+    if arguments:
+        lines += ["| Argument | Type | Required |", "|---|---|---|", *arguments, ""]
+    return lines
 
 
 def _arguments(tool: object) -> list[str]:
@@ -205,6 +278,12 @@ def _configuration() -> str:
         "",
         "The key lists below are read out of the loader itself, so they are what",
         "it actually accepts.",
+        "",
+        ":::{important}",
+        "`workspace.root` is the whole sandbox. Every path an MCP client supplies",
+        "is resolved -- symlinks and `..` included -- and refused if it lands",
+        "outside. There is no second mechanism and no way to opt out.",
+        ":::",
         "",
     ]
 

@@ -1,0 +1,39 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+
+/* Reference tables carry long message text and many columns. Left aligned,
+   with the first column allowed to stay narrow, reads far better than the
+   theme's default even distribution. */
+table.docutils {
+    display: block;
+    overflow-x: auto;
+    width: 100%;
+}
+
+table.docutils td,
+table.docutils th {
+    vertical-align: top;
+    text-align: left;
+}
+
+table.docutils th {
+    white-space: nowrap;
+}
+
+/* A key or a tool name is an identifier; it should not wrap mid-word. */
+table.docutils td code,
+table.docutils th code {
+    white-space: nowrap;
+}
+
+/* The tool reference is a long list of headings. Giving each one a rule makes
+   it scannable instead of a uniform column of text. */
+section > h2 {
+    border-bottom: 1px solid var(--color-background-border);
+    padding-bottom: 0.2rem;
+}
+
+/* Cards on the landing page: keep the title tight against its text. */
+.sd-card-title {
+    font-weight: 600;
+    margin-bottom: 0.35rem;
+}

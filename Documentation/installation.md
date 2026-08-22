@@ -37,10 +37,14 @@ podman build -t weft-tools -f containers/Containerfile.weft-tools .
 pip install --user .
 ```
 
+:::{warning}
 `uidmap` is only a *Recommends* of `podman`, so a plain `apt install` pulls it
 in but `--no-install-recommends` does not. Rootless Podman needs it.
 
-Ubuntu 22.04 ships Python 3.10, which is below what WEFT needs.
+Ubuntu 22.04 ships Python 3.10, which is below what WEFT needs. Move to 24.04
+or install a newer interpreter, for instance with
+[uv](https://github.com/astral-sh/uv).
+:::
 
 ## The container image
 
@@ -49,8 +53,10 @@ distribution to GPL-3.0-only code rather than an aggregate of third-party
 binaries under mixed licences. `podman build` is the only step that needs
 network access; everything afterwards runs offline.
 
-GHDL is compiled from source during the build, so expect the first build to
-take a while.
+:::{note}
+GHDL is compiled from source during the build, so the first one takes a while.
+It is also the only step in this whole document that touches the network.
+:::
 
 ## Running
 

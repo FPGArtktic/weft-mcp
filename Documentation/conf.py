@@ -25,7 +25,7 @@ author = "Mateusz Okulanis"
 release = __version__
 version = __version__
 
-extensions = ["myst_parser", "sphinx_copybutton"]
+extensions = ["myst_parser", "sphinx_copybutton", "sphinx_design"]
 
 myst_enable_extensions = ["colon_fence", "deflist", "linkify", "substitution"]
 myst_heading_anchors = 3
@@ -35,7 +35,38 @@ exclude_patterns = ["_build"]
 
 html_theme = "furo"
 html_title = f"WEFT {release}"
-html_static_path = []
+html_static_path = ["_static"]
+html_css_files = ["weft.css"]
+html_logo = "_static/weft.svg"
+html_favicon = "_static/weft.svg"
+html_copy_source = False
+html_show_sourcelink = False
+
+#: The warp is held under tension and the weft crosses it; the palette is the
+#: same two, slate and copper. Both schemes are defined in full rather than
+#: one inheriting the other, so a reader in either gets colours that were
+#: chosen rather than derived.
+html_theme_options = {
+    "light_css_variables": {
+        "color-brand-primary": "#a2542a",
+        "color-brand-content": "#a2542a",
+        "color-api-name": "#a2542a",
+        "color-api-pre-name": "#7a3f20",
+        "color-admonition-title--note": "#3f5a73",
+        "color-admonition-title-background--note": "#e8eef4",
+    },
+    "dark_css_variables": {
+        "color-brand-primary": "#e0955f",
+        "color-brand-content": "#e0955f",
+        "color-api-name": "#e0955f",
+        "color-api-pre-name": "#c2703a",
+        "color-admonition-title--note": "#8fb0cc",
+        "color-admonition-title-background--note": "#1e2833",
+    },
+    "source_repository": "https://github.com/FPGArtktic/weft-mcp/",
+    "source_branch": "main",
+    "source_directory": "Documentation/",
+}
 
 # The generated documents examples/counter/docs holds are output, not sources.
 suppress_warnings = ["myst.header"]

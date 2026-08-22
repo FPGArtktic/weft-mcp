@@ -45,6 +45,9 @@ docs = [
     "myst-parser>=4",
     "furo>=2024.8",
     "sphinx-copybutton>=0.5",
+    # Grids and cards, so a landing page is a way in rather than a wall of
+    # prose with a table of contents under it. MIT.
+    "sphinx-design>=0.6",
     "linkify-it-py>=2",
 ]
 
