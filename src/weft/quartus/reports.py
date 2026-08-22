@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-only
+# SPDX-License-Identifier: GPL-3.0-only
 """Turning Quartus reports into something small enough to send.
 
 A compile leaves megabytes of .rpt behind. What a caller wants from it is a

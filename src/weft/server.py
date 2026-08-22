@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-only
+# SPDX-License-Identifier: GPL-3.0-only
 """MCP server entry point.
 
 The same tool implementations are served over stdio and over Streamable HTTP;

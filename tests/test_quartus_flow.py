@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-only
+# SPDX-License-Identifier: GPL-3.0-only
 """Tests for starting compilations.
 
 No Quartus runs here. The command line that would have been executed is

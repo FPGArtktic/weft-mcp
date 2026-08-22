@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-only
+// SPDX-License-Identifier: GPL-3.0-only
 /**
  * debouncer - input synchroniser, contact debouncer and edge detector
  * @CLK_HZ:     clock frequency in Hz, used to size the stability counter

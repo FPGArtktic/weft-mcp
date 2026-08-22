@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-only
+// SPDX-License-Identifier: GPL-3.0-only
 /**
  * clk_tick - clock divider emitting a one-cycle tick at TICK_HZ
  * @CLK_HZ:  input clock frequency in Hz

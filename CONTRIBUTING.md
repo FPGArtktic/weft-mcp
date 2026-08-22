@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: GPL-2.0-only -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
 
 # Contributing to WEFT
 
@@ -9,7 +9,7 @@ exists so that the history stays readable years from now.
 ## Sign your work
 
 Every commit carries a `Signed-off-by:` line. It certifies that you wrote the
-patch or otherwise have the right to submit it under GPL-2.0-only, in the
+patch or otherwise have the right to submit it under GPL-3.0-only, in the
 sense of the [Developer Certificate of Origin](https://developercertificate.org/).
 
 ```bash
@@ -54,7 +54,7 @@ a special case appears, look for the way to make it disappear rather than
 branching around it. Handle errors where they happen; never swallow one
 silently.
 
-Every file starts with `# SPDX-License-Identifier: GPL-2.0-only`, in whatever
+Every file starts with `# SPDX-License-Identifier: GPL-3.0-only`, in whatever
 comment syntax the language uses. Public functions carry a kernel-doc-flavoured
 docstring: one-line summary, arguments, return value, failure modes.
 
@@ -81,7 +81,9 @@ the tool's format fails here rather than in front of a user.
 
 Prefer the standard library. A new dependency needs a one-line justification
 in the commit body and a check that its licence is compatible with
-GPL-2.0-only — note that Apache-2.0 is **not**.
+GPL-3.0-only. Apache-2.0 is compatible in that direction, so an Apache-2.0
+dependency may be used; GPLv2-only code may not, because this project moved
+past it.
 
 ## Scope
 

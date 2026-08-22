@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-only
+# SPDX-License-Identifier: GPL-3.0-only
 """Persistent job store for long-running compilations.
 
 A compilation outlives the request that started it and may outlive the server

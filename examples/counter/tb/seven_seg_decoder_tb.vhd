@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: GPL-2.0-only
+-- SPDX-License-Identifier: GPL-3.0-only
 --
 -- seven_seg_decoder_tb - checks all sixteen patterns and the blank input
 --

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-only
+// SPDX-License-Identifier: GPL-3.0-only
 /**
  * updown_counter - up/down counter with enable and synchronous clear
  * @WIDTH:  counter width in bits

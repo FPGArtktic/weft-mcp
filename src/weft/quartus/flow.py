@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-only
+# SPDX-License-Identifier: GPL-3.0-only
 """Starting Quartus compilations as persistent jobs.
 
 A compilation is long, so it is handed to the job store rather than waited on.

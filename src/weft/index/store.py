@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-only
+# SPDX-License-Identifier: GPL-3.0-only
 """The symbol index: what was found, and where.
 
 Indexing is on demand, so the store has to survive between runs and know what

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-only
+// SPDX-License-Identifier: GPL-3.0-only
 /**
  * counter_top - eight-bit demonstration counter driving LEDs and a display
  * @CLK_HZ:    board clock frequency in Hz

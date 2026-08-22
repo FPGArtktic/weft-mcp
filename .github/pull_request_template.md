@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: GPL-2.0-only -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
 
 ## What this changes, and why
 
@@ -18,4 +18,4 @@ rejected, the reason this is the right shape. Wrap at a sensible width.
 - [ ] `ruff check .` and `ruff format --check .` are clean
 - [ ] `pytest` passes without Quartus and without a board
 - [ ] New behaviour has a test; a bug fix has the test that would have caught it
-- [ ] Any new dependency is justified in the commit body and is GPL-2.0-only compatible
+- [ ] Any new dependency is justified in the commit body and is GPL-3.0-only compatible

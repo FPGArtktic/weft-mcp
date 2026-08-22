@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-only
+# SPDX-License-Identifier: GPL-3.0-only
 """Extracting VHDL structure from GHDL's XML dump.
 
 `ghdl --file-to-xml` does more than parse: it analyses, so an entity

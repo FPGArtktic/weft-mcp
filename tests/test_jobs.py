@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-only
+# SPDX-License-Identifier: GPL-3.0-only
 """Tests for the persistent job store.
 
 These use real processes rather than mocks: what is being tested is exactly

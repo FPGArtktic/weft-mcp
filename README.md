@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: GPL-2.0-only -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
 
 # WEFT — WEFT Elaborates FPGA Toolchains
 
@@ -137,7 +137,7 @@ uv venv --python 3.12 && uv pip install .
 ### Building the image
 
 The image is **never distributed** — you build it, which keeps WEFT's own
-distribution to GPL-2.0-only code and avoids shipping an aggregate of
+distribution to GPL-3.0-only code and avoids shipping an aggregate of
 third-party binaries under mixed licences. `podman build` is the only step
 that needs network access; everything afterwards runs offline.
 
@@ -255,7 +255,7 @@ especially, if you have driven this toolchain harder than I have.
 
 Copyright (C) 2026 Mateusz Okulanis.
 
-GPL-2.0-only. The full text is in [COPYING](COPYING).
+GPL-3.0-only. The full text is in [COPYING](COPYING).
 
 WEFT invokes Quartus and the containerised tools as separate programs and
 distributes none of them.

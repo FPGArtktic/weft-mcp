@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-only
+# SPDX-License-Identifier: GPL-3.0-only
 """TOML configuration: loading and validation.
 
 The layout follows PROJECT.md 5.1. Quartus install paths always come from

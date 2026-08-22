@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-only
+# SPDX-License-Identifier: GPL-3.0-only
 """Path validation against the configured workspace root.
 
 Every path that originates from an MCP client passes through resolve() before

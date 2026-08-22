@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-only
+# SPDX-License-Identifier: GPL-3.0-only
 """What an indexed design is made of.
 
 One shape for every language. Verilog and VHDL spell these things

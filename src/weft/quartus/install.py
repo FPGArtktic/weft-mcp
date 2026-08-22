@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-only
+# SPDX-License-Identifier: GPL-3.0-only
 """Locating and identifying a host Quartus installation.
 
 Everything that runs a Quartus tool goes through an Install: it knows where

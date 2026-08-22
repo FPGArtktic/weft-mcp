@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-only
+# SPDX-License-Identifier: GPL-3.0-only
 """Tests for pulling structure out of Verible's and GHDL's output.
 
 These run the real parsers. A fixture would have to be the whole syntax tree --

@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: GPL-2.0-only
+-- SPDX-License-Identifier: GPL-3.0-only
 --
 -- seven_seg_decoder - hexadecimal digit to seven-segment patterns
 -- @nibble: value to display, 0 to F

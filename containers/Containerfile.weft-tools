@@ -1,9 +1,9 @@
-# SPDX-License-Identifier: GPL-2.0-only
+# SPDX-License-Identifier: GPL-3.0-only
 #
 # weft-tools - every external binary WEFT executes, except Quartus itself.
 #
 # The project never ships this image: each user builds it locally, so WEFT
-# distributes only its own GPL-2.0-only code and never an aggregate of
+# distributes only its own GPL-3.0-only code and never an aggregate of
 # third-party binaries under mixed licences (PROJECT.md 5.2 and 7).
 #
 #     podman build -t weft-tools -f containers/Containerfile.weft-tools .

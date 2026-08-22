@@ -34,7 +34,7 @@ The primary client is Claude (Desktop / Code) over MCP stdio or Streamable HTTP.
 
 | Area | Decision |
 |---|---|
-| License | **GPL-2.0-only**, SPDX headers in every file, DCO sign-off (kernel model) |
+| License | **GPL-3.0-only**, SPDX headers in every file, DCO sign-off (kernel model) |
 | Quartus | **Installed on the host**, both Lite/Standard and Pro; WEFT calls host binaries, edition and install paths set in config |
 | Open-source tooling | **In Podman**: one `weft-tools` image, **Arch Linux base**, containing Verilator, Icarus Verilog, GHDL, Verible, cocotb |
 | Embeddings | **BGE-M3** (dense vectors, 1024-dim, 8k-token context), run locally |
@@ -102,7 +102,7 @@ The primary client is Claude (Desktop / Code) over MCP stdio or Streamable HTTP.
 
 ### 5.2 Container (Podman, rootless)
 - **One image: `weft-tools`**, based on **`archlinux:base`** — every external binary WEFT shells out to, except Quartus itself: Verilator, Icarus Verilog, GHDL, Verible, cocotb, plus Tesseract with its language data and Poppler (`pdftotext`) for the RAG ingest path, plus a Python layer for helper scripts. Packages come from the official repositories where available; the two that do not (GHDL and Verible) are built in a separate builder stage, so the final image carries no AUR helper.
-- **The image is never distributed.** The repository ships `containers/Containerfile.weft-tools` and nothing else; every user builds the image locally with `podman build`. WEFT therefore distributes only its own GPL-2.0-only code, never an aggregate of third-party binaries under mixed licences — see §7.
+- **The image is never distributed.** The repository ships `containers/Containerfile.weft-tools` and nothing else; every user builds the image locally with `podman build`. WEFT therefore distributes only its own GPL-3.0-only code, never an aggregate of third-party binaries under mixed licences — see §7.
 - Invocation: `podman run --rm --network=none -v <workspace>:/work weft-tools …`.
 - Only the workspace directory is mounted; all user-supplied paths are validated against the workspace root (path-traversal protection). The same validation applies to host-side Quartus invocations — WEFT never touches files outside the workspace.
 
@@ -137,9 +137,9 @@ The primary client is Claude (Desktop / Code) over MCP stdio or Streamable HTTP.
 - English README and `Documentation/` tree; CI running lint + unit tests; an example demo project (counter + testbench, Cyclone-class dev board).
 
 ## 7. Licensing
-- **GPL-2.0-only** for all project code; `COPYING` contains the full GPLv2 text; every source file starts with `// SPDX-License-Identifier: GPL-2.0-only` (or the language-appropriate comment form).
+- **GPL-3.0-only** for all project code; `COPYING` contains the full GPLv2 text; every source file starts with `// SPDX-License-Identifier: GPL-3.0-only` (or the language-appropriate comment form).
 - Contributions follow the **Developer Certificate of Origin** — every commit carries `Signed-off-by:`.
-- Python dependencies are fetched at install time by the user and are not vendored into the repository, keeping the GPLv2 distribution limited to project code. (Note, not legal advice: license compatibility of any dependency bundled into future binary distributions must be reviewed — notably Apache-2.0 dependencies, which are incompatible with GPL-2.0-only when combined in one distributed work.)
+- Python dependencies are fetched at install time by the user and are not vendored into the repository, keeping the GPLv3 distribution limited to project code. (Note, not legal advice: the licence of any dependency bundled into a future binary distribution still has to be reviewed, but GPLv3 removes the sharpest edge the project had under GPLv2 — Apache-2.0 is compatible with GPLv3 in one direction, so Apache-2.0 code may be combined into this work, though not the reverse.)
 - WEFT invokes Quartus as separate host programs — the standard "mere aggregation / separate works" situation; no Quartus components are distributed.
 - The same reasoning covers `weft-tools`: WEFT *executes* the containerised tools, it never links their code. The tools carry their own licences — GHDL is GPL-2.0-only, Verible is Apache-2.0 — and because the image is built by the user rather than shipped by the project, no combined distribution ever arises. Any AUR helper used during the build stays in the builder stage and is absent from the final image.
 - No Intel/Altera files, IEEE PDFs, or Intel documentation in the repository — ever.
@@ -160,7 +160,7 @@ The primary client is Claude (Desktop / Code) over MCP stdio or Streamable HTTP.
 
 ### 8.3 HDL header convention (kernel-doc adapted)
 ```systemverilog
-// SPDX-License-Identifier: GPL-2.0-only
+// SPDX-License-Identifier: GPL-3.0-only
 /**
  * uart_tx - UART transmitter, 8N1, parameterized baud divisor
  * @CLK_HZ:    input clock frequency in Hz

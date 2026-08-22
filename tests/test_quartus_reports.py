@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-only
+# SPDX-License-Identifier: GPL-3.0-only
 """Tests for report parsing.
 
 Every fragment here is captured verbatim from a real Quartus 25.1std compile,

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-only
+# SPDX-License-Identifier: GPL-3.0-only
 """Tests for indexing a directory.
 
 The container tests run the real parsers over a small mixed-language project,

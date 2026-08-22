@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-only
+# SPDX-License-Identifier: GPL-3.0-only
 """Extracting Verilog and SystemVerilog structure from Verible's syntax tree.
 
 Verible parses; this walks what it produced. Node text is recovered from the

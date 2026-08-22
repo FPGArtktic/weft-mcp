@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-only
+# SPDX-License-Identifier: GPL-3.0-only
 """Tests for identifying a Quartus installation.
 
 No Quartus is run here. The Lite banner is captured verbatim from a real

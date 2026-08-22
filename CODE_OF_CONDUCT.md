@@ -1,6 +1,6 @@
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 <!-- The Contributor Covenant is distributed under CC BY 4.0; the rest of
-     this repository is GPL-2.0-only. Only the contact address below was
+     this repository is GPL-3.0-only. Only the contact address below was
      filled in. -->
 
 # Contributor Covenant Code of Conduct

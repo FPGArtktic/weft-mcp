@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: GPL-2.0-only -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
 
 # Changelog
 
@@ -13,7 +13,14 @@ the summary you can read in a minute.
 
 ## Unreleased
 
-Nothing yet.
+### Changed
+
+- The project moves from **GPL-2.0-only to GPL-3.0-only**. Releases up to and
+  including 0.3.0 were made under GPLv2; their tags stand as they were. Only
+  WEFT's own files changed: the licences of GHDL, Verible and everything else
+  in `weft-tools` are their own and are stated as such. Under GPLv3 an
+  Apache-2.0 dependency may be combined into this work, which GPLv2 did not
+  allow.
 
 ## [0.3.0] — 2026-08-22
 
@@ -89,7 +96,7 @@ Milestone 1 — the fast loop.
 - `server`: TOML configuration. Quartus paths always come from it; unknown
   keys are refused rather than ignored.
 - `containers`: the `weft-tools` image definition. Built by each user and
-  never distributed, which keeps WEFT's own distribution to GPL-2.0-only code.
+  never distributed, which keeps WEFT's own distribution to project code alone.
 - `Documentation`: the counter demonstration project, written in
   SystemVerilog, Verilog-2001 and VHDL at once.
 

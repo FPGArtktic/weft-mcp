@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-only
+# SPDX-License-Identifier: GPL-3.0-only
 """Create a project with a real Quartus and compile it.
 
 The unit tests capture the Tcl instead of running it; this checks that Quartus

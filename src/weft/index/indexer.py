@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-only
+# SPDX-License-Identifier: GPL-3.0-only
 """Indexing a directory of HDL on demand.
 
 Nothing watches the filesystem. A caller asks for a directory and gets what is
