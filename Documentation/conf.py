@@ -42,8 +42,19 @@ suppress_warnings = ["myst.header"]
 
 
 def setup(app):
-    """setup - write the generated pages before the build reads them."""
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    """setup - write the generated pages before the build reads them.
+
+    A drift between the code and what is documented about it is raised as an
+    ExtensionError, so the build says what is out of date instead of printing
+    a traceback that invites the reader to report a Sphinx bug.
+    """
+    from sphinx.errors import ExtensionError
+
+    here = Path(__file__).resolve().parent
+    sys.path.insert(0, str(here))
     import generate
 
-    generate.write(Path(__file__).resolve().parent)
+    try:
+        generate.write(here)
+    except ValueError as e:
+        raise ExtensionError(f"documentation is out of date with the code: {e}") from e

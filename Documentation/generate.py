@@ -85,39 +85,141 @@ def _type(spec: dict) -> str:
     return "any"
 
 
+#: What every configuration key means. The prose lives here rather than in a
+#: hand-written page so that it can be checked against the loader: a key added
+#: to config.py and not described here fails the documentation build, and so
+#: does a description of a key the loader no longer accepts.
+KEYS: dict[tuple[str, str], tuple[str, str]] = {
+    ("top level", "workspace"): ("Sandbox root. **Required.**", ""),
+    ("top level", "container"): ("Which image the containerised tools run in.", ""),
+    ("top level", "quartus"): ("Host Quartus installations, by edition.", ""),
+    ("top level", "questa"): ("Host Questa installation.", ""),
+    ("top level", "jobs"): ("Where compilation job state lives, and its time limit.", ""),
+    ("top level", "rag"): ("The document library, its index, and the embedding model.", ""),
+    ("top level", "http"): ("Streamable HTTP transport.", ""),
+    ("workspace", "root"): (
+        "The only directory WEFT can read or write. Every path an MCP client "
+        "supplies is resolved -- symlinks and `..` included -- and refused if it "
+        "lands outside. **Required; must exist.**",
+        "none",
+    ),
+    ("container", "image"): (
+        "Name of the locally built `weft-tools` image. It is never pulled: you "
+        "build it, which is what keeps WEFT's own distribution to GPL-3.0-only "
+        "code.",
+        "`weft-tools`",
+    ),
+    ("quartus", "edition"): (
+        "Which edition a tool uses when it does not name one. May be omitted "
+        "when exactly one is configured; naming an unconfigured edition fails "
+        "at startup.",
+        "the only configured edition",
+    ),
+    ("quartus", "lite"): ("The `[quartus.lite]` table.", "not configured"),
+    ("quartus", "pro"): ("The `[quartus.pro]` table.", "not configured"),
+    ("quartus.<edition>", "root"): (
+        "Install root, the directory holding `bin/quartus_sh`. Checked at "
+        "startup, so a mistyped path fails then rather than in the middle of a "
+        "compilation. WEFT never searches `PATH` and never guesses.",
+        "none",
+    ),
+    ("quartus.<edition>", "env"): (
+        "Extra environment for every invocation of that edition. This is where "
+        "FlexLM variables go for Pro, which will not run without them.",
+        "empty",
+    ),
+    ("questa", "root"): (
+        "Install root, the directory holding `bin/vsim`. Questa ships beside "
+        "Quartus and is the only simulator here that reads Verilog, "
+        "SystemVerilog and VHDL in one run. Without this section, `simulate` "
+        "and `lint` keep to the containerised tools.",
+        "none",
+    ),
+    ("questa", "env"): (
+        "Extra environment for every invocation. Questa - Altera Starter FPGA "
+        "Edition reads its licence from `SALT_LICENSE_SERVER`, which a server "
+        "started outside a desktop session does not inherit.",
+        "empty",
+    ),
+    ("jobs", "database"): (
+        "SQLite file holding job state across restarts. A compilation survives "
+        "the server being killed; losing it would be a bug.",
+        "`<workspace>/.weft/jobs.sqlite`",
+    ),
+    ("jobs", "timeout_s"): (
+        "Wall-clock limit for one compilation, in seconds.",
+        "`7200`",
+    ),
+    ("rag", "library"): (
+        "Where your PDFs live. Mounted **read-only**, and separate from the "
+        "workspace because a collection of standards outlives any one project. "
+        "Nothing in it is indexed automatically -- `index_document` reads one "
+        "document when asked, and `list_indexed_docs` says what is waiting.",
+        "the workspace root",
+    ),
+    ("rag", "database"): (
+        "The document index. Put it outside the workspace to index a library "
+        "once and search it from every project.",
+        "`<workspace>/.weft/documents.sqlite`",
+    ),
+    ("rag", "model_path"): (
+        "Local BGE-M3 weights in ONNX form. Without them retrieval still works, "
+        "by text rather than by meaning, and every result says which of the two "
+        "answered it. A configured model that cannot be loaded is an error, not "
+        "a reason to fall back quietly.",
+        "no model",
+    ),
+    ("http", "host"): ("Address the HTTP transport binds.", "`127.0.0.1`"),
+    ("http", "port"): ("Port the HTTP transport binds.", "`8080`"),
+    ("http", "token"): (
+        "Static bearer token. Every request must carry "
+        "`Authorization: Bearer <token>`; the transport refuses to start "
+        "without one.",
+        "none",
+    ),
+}
+
+
 def _configuration() -> str:
-    """_configuration - every key the loader accepts, read from the loader.
+    """_configuration - the reference for every key the loader accepts
 
-    The keys come from the _reject_unknown() calls in config.py, which are the
-    same lists that decide what is refused at startup. Documenting them from
-    anywhere else would let the two disagree, and the loader would win.
+    The key lists come from the `_reject_unknown()` calls in config.py, which
+    are the same lists that decide what is refused at startup. The
+    descriptions come from KEYS above. The two are compared, so a key added to
+    one and not the other fails the build rather than shipping a reference
+    that is quietly incomplete.
     """
-    source = Path(__file__).resolve().parent.parent / "src" / "weft" / "config.py"
-    tree = ast.parse(source.read_text())
-
-    tables: dict[str, list[str]] = {}
-    for node in ast.walk(tree):
-        if not (isinstance(node, ast.Call) and getattr(node.func, "id", "") == "_reject_unknown"):
-            continue
-        if len(node.args) != 3 or not isinstance(node.args[2], ast.Constant):
-            continue
-        keys = [k.value for k in node.args[1].elts if isinstance(k, ast.Constant)]
-        tables[str(node.args[2].value)] = sorted(keys)
+    tables = _accepted_keys()
+    _check(tables)
 
     lines = [
         "# Configuration",
         "",
-        "WEFT reads one TOML file, by default `~/.config/weft/weft.toml`.",
-        "Unknown keys are refused rather than ignored, so a typo fails at",
+        "WEFT reads one TOML file. It is found, in order, at `--config`, then",
+        "`$WEFT_CONFIG`, then `~/.config/weft/weft.toml`.",
+        "",
+        "Only `[workspace]` is required. A machine with no Quartus still lints",
+        "and simulates; one with no embedding model still retrieves documents by",
+        "text. Unknown keys are refused rather than ignored, so a typo fails at",
         "startup instead of quietly doing nothing.",
         "",
-        "The tables below are read out of the loader itself, so they are the",
-        "keys it actually accepts.",
+        "The key lists below are read out of the loader itself, so they are what",
+        "it actually accepts.",
         "",
     ]
-    for table, keys in sorted(tables.items()):
+
+    for table in sorted(tables):
         title = "Top level" if table == "top level" else f"`[{table}]`"
-        lines += [f"## {title}", "", *[f"- `{key}`" for key in keys], ""]
+        lines += [
+            f"## {title}",
+            "",
+            "| Key | Meaning | Default |",
+            "|---|---|---|",
+        ]
+        for key in tables[table]:
+            meaning, default = KEYS[(table, key)]
+            lines.append(f"| `{key}` | {meaning} | {default or '—'} |")
+        lines.append("")
 
     lines += [
         "## A complete example",
@@ -129,6 +231,59 @@ def _configuration() -> str:
         "",
     ]
     return "\n".join(lines) + "\n"
+
+
+def _accepted_keys() -> dict[str, list[str]]:
+    """_accepted_keys - every table and key config.py will accept
+
+    Read from the `_reject_unknown()` calls rather than from a list kept
+    beside them, because the calls are what the loader enforces.
+    """
+    source = Path(__file__).resolve().parent.parent / "src" / "weft" / "config.py"
+    tree = ast.parse(source.read_text())
+
+    tables: dict[str, list[str]] = {}
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Call) and getattr(node.func, "id", "") == "_reject_unknown"):
+            continue
+        if len(node.args) != 3:
+            continue
+
+        where = node.args[2]
+        if isinstance(where, ast.Constant):
+            name = str(where.value)
+        elif isinstance(where, ast.JoinedStr):
+            # f"quartus.{name}" -- one table per edition, documented as one.
+            name = "".join(
+                part.value if isinstance(part, ast.Constant) else "<edition>"
+                for part in where.values
+            )
+        else:
+            continue
+
+        keys = [k.value for k in node.args[1].elts if isinstance(k, ast.Constant)]
+        tables[name] = sorted(keys)
+    return tables
+
+
+def _check(tables: dict[str, list[str]]) -> None:
+    """_check - refuse to build documentation that is out of date
+
+    Raises ValueError naming what is missing or stale. Failing the build is
+    the point: a reference that silently omits a new key is worse than no
+    reference, because a reader has no way to tell.
+    """
+    accepted = {(table, key) for table, keys in tables.items() for key in keys}
+    undocumented = sorted(accepted - set(KEYS))
+    stale = sorted(set(KEYS) - accepted)
+
+    problems = []
+    if undocumented:
+        problems.append(f"config.py accepts keys nothing describes: {undocumented}")
+    if stale:
+        problems.append(f"described keys the loader no longer accepts: {stale}")
+    if problems:
+        raise ValueError("; ".join(problems))
 
 
 if __name__ == "__main__":
