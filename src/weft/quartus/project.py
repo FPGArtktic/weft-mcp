@@ -156,6 +156,70 @@ def set_assignments(
     return Path(directory) / f"{revision}.qsf"
 
 
+#: Which .qsf assignment carries which kind of source.
+SOURCE_ASSIGNMENTS = {
+    "SYSTEMVERILOG_FILE": "systemverilog",
+    "VERILOG_FILE": "verilog",
+    "VHDL_FILE": "vhdl",
+    "SDC_FILE": "sdc",
+    "QIP_FILE": "qip",
+    "QSYS_FILE": "qsys",
+    "MIF_FILE": "mif",
+    "HEX_FILE": "hex",
+}
+
+#: Single-valued assignments worth reporting about a project.
+INFO_ASSIGNMENTS = {
+    "FAMILY": "family",
+    "DEVICE": "device",
+    "TOP_LEVEL_ENTITY": "top_entity",
+    "PROJECT_OUTPUT_DIRECTORY": "output_directory",
+    "ORIGINAL_QUARTUS_VERSION": "created_with",
+    "LAST_QUARTUS_VERSION": "last_opened_with",
+}
+
+_GLOBAL = re.compile(
+    r'^\s*set_global_assignment\s+-name\s+(?P<name>[A-Z0-9_]+)\s+(?P<value>"[^"]*"|\S+)',
+    re.M,
+)
+
+
+def project_info(directory: Path, revision: str) -> dict:
+    """project_info - what a project says about itself
+
+    @directory: the project directory
+    @revision: revision name, which is the .qsf basename
+
+    Read from the .qsf rather than through Tcl, so a project can be inspected
+    on a machine with no Quartus, and without the second or so a Tcl
+    invocation costs.
+
+    Return: the device and top entity, the sources grouped by language, and
+    the pin and instance assignment counts.
+
+    Raises ProjectError if the .qsf cannot be read.
+    """
+    revision = _name(revision)
+    qsf = Path(directory) / f"{revision}.qsf"
+    try:
+        text = qsf.read_text(errors="replace")
+    except OSError as e:
+        raise ProjectError(f"cannot read {qsf.name}: {e}") from e
+
+    info: dict = {"revision": revision, "sources": {}}
+    for m in _GLOBAL.finditer(text):
+        name, value = m["name"], m["value"].strip('"')
+        if name in INFO_ASSIGNMENTS:
+            info.setdefault(INFO_ASSIGNMENTS[name], value)
+        elif name in SOURCE_ASSIGNMENTS:
+            info["sources"].setdefault(SOURCE_ASSIGNMENTS[name], []).append(value)
+
+    info["pin_assignments"] = len(re.findall(r"^\s*set_location_assignment\s", text, re.M))
+    info["instance_assignments"] = len(re.findall(r"^\s*set_instance_assignment\s", text, re.M))
+    info["parameters"] = len(re.findall(r"^\s*set_parameter\s", text, re.M))
+    return info
+
+
 def list_projects(root: Path) -> list[str]:
     """list_projects - project files anywhere under @root
 

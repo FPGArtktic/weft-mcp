@@ -14,6 +14,7 @@ from weft.quartus.project import (
     ProjectError,
     create_project,
     list_projects,
+    project_info,
     set_assignments,
 )
 
@@ -155,3 +156,51 @@ def test_list_projects_finds_them_anywhere(tmp_path):
     (tmp_path / "b" / "deep" / "two.qpf").write_text("")
     (tmp_path / "not-a-project.txt").write_text("")
     assert list_projects(tmp_path) == ["a/one.qpf", "b/deep/two.qpf"]
+
+
+QSF = """\
+set_global_assignment -name FAMILY "MAX 10"
+set_global_assignment -name DEVICE 10M04SAE144A7G
+set_global_assignment -name TOP_LEVEL_ENTITY counter_top
+set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
+set_global_assignment -name SYSTEMVERILOG_FILE src/counter_top.sv
+set_global_assignment -name SYSTEMVERILOG_FILE src/debouncer.sv
+set_global_assignment -name VERILOG_FILE src/clk_tick.v
+set_global_assignment -name VHDL_FILE src/seven_seg_decoder.vhd
+set_global_assignment -name SDC_FILE counter.sdc
+set_location_assignment PIN_27 -to clk
+set_location_assignment PIN_28 -to rst_n
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to clk
+set_parameter -name WIDTH 8 -to u_count
+"""
+
+
+def test_project_info_groups_sources_by_language(tmp_path):
+    (tmp_path / "counter.qsf").write_text(QSF)
+    got = project_info(tmp_path, "counter")
+    assert got["sources"]["systemverilog"] == ["src/counter_top.sv", "src/debouncer.sv"]
+    assert got["sources"]["verilog"] == ["src/clk_tick.v"]
+    assert got["sources"]["vhdl"] == ["src/seven_seg_decoder.vhd"]
+    assert got["sources"]["sdc"] == ["counter.sdc"]
+
+
+def test_project_info_reads_the_device_and_top(tmp_path):
+    (tmp_path / "counter.qsf").write_text(QSF)
+    got = project_info(tmp_path, "counter")
+    assert (got["family"], got["device"], got["top_entity"]) == (
+        "MAX 10",
+        "10M04SAE144A7G",
+        "counter_top",
+    )
+    assert got["output_directory"] == "output_files"
+
+
+def test_project_info_counts_the_other_assignment_forms(tmp_path):
+    (tmp_path / "counter.qsf").write_text(QSF)
+    got = project_info(tmp_path, "counter")
+    assert (got["pin_assignments"], got["instance_assignments"], got["parameters"]) == (2, 1, 1)
+
+
+def test_project_info_needs_a_qsf(tmp_path):
+    with pytest.raises(ProjectError, match="cannot read counter.qsf"):
+        project_info(tmp_path, "counter")
