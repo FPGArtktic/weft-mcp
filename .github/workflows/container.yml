@@ -1,0 +1,88 @@
+# SPDX-License-Identifier: GPL-3.0-only
+#
+# Build weft-tools and run the tests that need it.
+#
+# Kept out of ci.yml on purpose. The image compiles GHDL from source and pulls
+# three packages from the AUR, which is a long build to put in front of every
+# push. But without it nothing ever proves the container works: eighteen tests
+# are marked `container` and skip themselves when the image is absent, so a CI
+# run that only ever skips them is a CI run that agrees with itself.
+#
+# So it runs where a break would actually mean something: when the Containerfile
+# or the code that drives it changes, once a week in case an upstream package
+# moves under us, and on demand.
+
+name: container
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "containers/**"
+      - "src/weft/podman.py"
+      - "src/weft/fastloop/**"
+      - "src/weft/index/**"
+      - "src/weft/rag/ingest.py"
+      - ".github/workflows/container.yml"
+  pull_request:
+    paths:
+      - "containers/**"
+      - "src/weft/podman.py"
+      - "src/weft/fastloop/**"
+      - "src/weft/index/**"
+      - "src/weft/rag/ingest.py"
+  schedule:
+    # Arch is a rolling release and the AUR moves. A weekly build is how a
+    # package that renamed itself gets noticed here rather than by a user.
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: container-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  image:
+    name: build and exercise weft-tools
+    runs-on: ubuntu-24.04
+    # GHDL from source is the long pole. Generous, but not unbounded: a build
+    # that hangs should fail rather than occupy a runner until it is noticed.
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build the image
+        run: podman build -t weft-tools -f containers/Containerfile.weft-tools .
+
+      # The tests look for this exact name, the same one the default
+      # configuration uses.
+      - name: Tag it as the tests expect
+        run: podman tag weft-tools localhost/weft-tools:latest
+
+      - name: Check every tool is actually in there
+        run: |
+          for tool in verilator iverilog ghdl verible-verilog-syntax \
+                      tesseract pdftotext pdftoppm make; do
+            podman run --rm --network=none weft-tools sh -c \
+              "command -v $tool >/dev/null" \
+              || { echo "MISSING: $tool"; exit 1; }
+            echo "present: $tool"
+          done
+
+      - run: pip install -e ".[dev]"
+
+      # -m container runs only the tests that need the image. If the image were
+      # missing, conftest would skip them all and this would pass having tested
+      # nothing, so the count is asserted rather than trusted.
+      - name: Run the container tests
+        run: |
+          pytest -q -m container --tb=short | tee result.txt
+          grep -qE '^[0-9]+ passed' result.txt \
+            || { echo "no container tests ran -- the image was not found"; exit 1; }

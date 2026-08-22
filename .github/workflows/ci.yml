@@ -4,9 +4,11 @@
 # of the three kinds of thing broke without anyone reading a log to find out.
 #
 # The container tests skip themselves when the weft-tools image is absent, and
-# it is absent here: building it compiles GHDL from source, which is minutes of
-# runner time on every push to prove something the image build itself proves.
-# The unit tests mock the container boundary, so what runs here is the logic.
+# it is absent here: building it compiles GHDL from source, which is a long
+# build to put in front of every push. The unit tests mock the container
+# boundary, so what runs here is the logic. container.yml builds the image for
+# real and runs those tests where a break would mean something -- when the
+# Containerfile changes, and weekly, because Arch is a rolling release.
 
 name: ci
 
