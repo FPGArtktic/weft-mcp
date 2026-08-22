@@ -178,7 +178,17 @@ change per commit, `subsystem: summary` subjects, a body that explains *why*,
 rebase rather than merge, and a `Signed-off-by:` line on everything. See
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## Author
+
+WEFT is written and maintained by **Mateusz Okulanis**
+([@FPGArtktic](https://github.com/FPGArtktic)), who can be reached at
+FPGArtktic@outlook.com. Bug reports, patches and disagreements are all
+welcome — the last of those especially, if you have driven this toolchain
+harder than I have.
+
 ## Licence
+
+Copyright (C) 2026 Mateusz Okulanis.
 
 GPL-2.0-only. The full text is in [COPYING](COPYING).
 
