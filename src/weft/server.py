@@ -17,7 +17,7 @@ from mcp.server import MCPServer
 from mcp.server.auth.provider import AccessToken
 
 from . import __version__
-from .config import Config, load
+from .config import STATE_DIR, Config, load
 from .fastloop.lint import lint as run_lint
 from .fastloop.simulate import simulate as run_simulate
 from .index import indexer
@@ -42,9 +42,6 @@ DEFAULT_SEARCH_HITS = 20
 #: Passages returned by a document search. Fewer than code hits, because each
 #: one is a paragraph rather than a line.
 DEFAULT_DOC_HITS = 6
-
-#: State WEFT keeps inside the workspace, matching config.STATE_DIR.
-STATE_DIR = ".weft"
 
 CONFIG_ENV = "WEFT_CONFIG"
 DEFAULT_CONFIG = Path("~/.config/weft/weft.toml")
@@ -470,7 +467,7 @@ def build(config: Config) -> MCPServer:
             return {"top": top, "indexed": False}
         return tree
 
-    documents = DocumentStore(config.workspace / STATE_DIR / "documents.sqlite")
+    documents = DocumentStore(config.rag_db)
     embedder = Embeddings(config)
 
     @server.tool(

@@ -57,7 +57,7 @@ class Config:
     @edition: edition used when a tool does not name one
     @jobs_db: SQLite file holding job state across restarts
     @job_timeout_s: wall-clock limit for a single compilation
-    @rag_db: sqlite-vec store for documents, code, and generated docs
+    @rag_db: sqlite-vec store for indexed documents
     @rag_model: local BGE-M3 weights; None disables the RAG tools
     @http: HTTP transport settings
     """
@@ -119,7 +119,7 @@ def load(path: str | Path) -> Config:
         edition=edition,
         jobs_db=Path(jobs.get("database", state / "jobs.sqlite")),
         job_timeout_s=int(jobs.get("timeout_s", DEFAULT_JOB_TIMEOUT_S)),
-        rag_db=Path(rag.get("database", state / "rag.sqlite")),
+        rag_db=Path(rag.get("database", state / "documents.sqlite")),
         rag_model=Path(rag["model_path"]) if "model_path" in rag else None,
         http=Http(
             host=http.get("host", DEFAULT_HTTP_HOST),

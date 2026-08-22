@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Tests for TOML configuration loading and validation."""
 
+from pathlib import Path
+
 import pytest
 
 from weft.config import (
@@ -43,7 +45,20 @@ def test_minimal_config_applies_defaults(tmp_path):
 def test_state_files_default_into_the_workspace(tmp_path):
     cfg = load(write(tmp_path, '[workspace]\nroot = "@WS@"\n'))
     assert cfg.jobs_db == tmp_path / "ws" / ".weft" / "jobs.sqlite"
-    assert cfg.rag_db == tmp_path / "ws" / ".weft" / "rag.sqlite"
+    assert cfg.rag_db == tmp_path / "ws" / ".weft" / "documents.sqlite"
+
+
+def test_state_files_can_be_placed_elsewhere(tmp_path):
+    cfg = load(
+        write(
+            tmp_path,
+            '[workspace]\nroot = "@WS@"\n'
+            '[jobs]\ndatabase = "/var/lib/weft/jobs.sqlite"\n'
+            '[rag]\ndatabase = "/var/lib/weft/documents.sqlite"\n',
+        )
+    )
+    assert cfg.jobs_db == Path("/var/lib/weft/jobs.sqlite")
+    assert cfg.rag_db == Path("/var/lib/weft/documents.sqlite")
 
 
 def test_missing_workspace_section(tmp_path):
