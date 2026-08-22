@@ -25,6 +25,8 @@ from .index.store import SymbolStore
 from .jobs import JobStore
 from .quartus import flow, project, reports
 from .quartus.install import Install, InstallError, probe
+from .rag import chunk, ingest
+from .rag.store import TEXT, DocumentStore
 from .sandbox import resolve
 
 #: A tool result stays small enough for a client to read without paging.
@@ -35,6 +37,10 @@ DEFAULT_LOG_TAIL = 100
 
 #: Default number of search hits returned.
 DEFAULT_SEARCH_HITS = 20
+
+#: Passages returned by a document search. Fewer than code hits, because each
+#: one is a paragraph rather than a line.
+DEFAULT_DOC_HITS = 6
 
 #: State WEFT keeps inside the workspace, matching config.STATE_DIR.
 STATE_DIR = ".weft"
@@ -428,6 +434,73 @@ def build(config: Config) -> MCPServer:
         if tree is None:
             return {"top": top, "indexed": False}
         return tree
+
+    documents = DocumentStore(config.workspace / STATE_DIR / "documents.sqlite")
+
+    @server.tool(
+        description=(
+            "Index a PDF for retrieval. Pages with a text layer are extracted, "
+            "pages without one are OCR'd, and the document is cut at its own "
+            "clause headings so a result can be cited by clause rather than page."
+        )
+    )
+    def index_document(
+        path: str, doc_type: str | None = None, language: str = "eng"
+    ) -> dict[str, Any]:
+        """index_document - read a document into the retrieval store
+
+        @path: workspace-relative path to the PDF
+        @doc_type: your label -- standard, handbook, user_guide -- for filtering
+        @language: Tesseract language for pages that need OCR
+
+        Return: what was indexed, including how many pages needed OCR and how
+        many chunks carry a clause number.
+        """
+        pages = ingest.extract(config.image, config.workspace, path, language=language)
+        pieces = chunk.chunks(pages)
+        stored = documents.add(
+            path,
+            pieces,
+            pages=len(pages),
+            ocr_pages=sum(1 for p in pages if p.ocr),
+            designation=chunk.designation(pages),
+            doc_type=doc_type,
+        )
+        return asdict(stored) | {
+            "clauses": sum(1 for c in pieces if c.clause),
+            "retrieval": TEXT,
+        }
+
+    @server.tool(
+        description=(
+            "Search the indexed documents. Results carry a citation: the clause "
+            "number where the document has one, the page otherwise. The result "
+            "says which kind of retrieval answered it."
+        )
+    )
+    def search_docs(
+        query: str, top_k: int = DEFAULT_DOC_HITS, doc_type: str | None = None
+    ) -> dict[str, Any]:
+        """search_docs - find passages answering @query
+
+        @query: what to look for
+        @top_k: how many passages to return
+        @doc_type: restrict to one label
+
+        Return: the passages, and the retrieval method that found them.
+        """
+        found = documents.search_text(query, limit=top_k, doc_type=doc_type)
+        return {
+            "retrieval": TEXT,
+            "count": len(found),
+            "passages": [asdict(p) for p in found],
+        }
+
+    @server.tool(description="The documents currently indexed for retrieval.")
+    def list_indexed_docs() -> dict[str, Any]:
+        """list_indexed_docs - what has been read into the retrieval store."""
+        found = documents.documents()
+        return {"count": len(found), "documents": [asdict(d) for d in found]}
 
     return server
 
