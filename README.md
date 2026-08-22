@@ -86,6 +86,9 @@ inside the container alike.
 
 Nothing reaches the network at runtime, and nothing reports telemetry.
 
+The full design — every tool's arguments and return shape, the milestones, and the reasoning behind the awkward parts — is in
+[PROJECT.md](PROJECT.md).
+
 ## Requirements
 
 - **Quartus Prime 25.1** (Lite, Standard or Pro) installed and licensed by you
