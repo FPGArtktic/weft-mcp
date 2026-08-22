@@ -173,6 +173,28 @@ The same structure applies to VHDL entities using `--` comments. `generate_docs`
 
 ## Appendix A — Air-gapped deployment (DevOps hand-off; out of scope)
 - Client model: Kimi K2 on **32× NVIDIA H100 80 GB** — 2.56 TB of aggregate HBM. That is enough for the FP8 variant (~1 TB of weights) with the rest left for KV cache, which removes the constraint that shaped the earlier 8-GPU sizing: INT4 (~594 GB) is no longer the only variant that fits, and long contexts and real concurrency stop competing with the weights for memory. Sizing at this scale is a tensor/pipeline-parallel layout question rather than a fit question, and belongs with whoever owns the cluster.
+- Cluster shape: 32 H100s is four eight-GPU nodes, which is the form these
+  accelerators are sold and racked in. That split is not incidental — it decides
+  how the model is cut up. Inside a node the GPUs sit on an NVLink/NVSwitch
+  domain roughly an order of magnitude faster than anything between nodes, so
+  tensor parallelism, which exchanges activations on every layer, has to stay
+  inside one node. Pipeline parallelism only passes activations at stage
+  boundaries and tolerates the slower inter-node fabric. The natural mapping is
+  therefore tensor-parallel across the eight GPUs of a node and pipeline-parallel
+  across the four nodes. Getting this backwards — pipelining inside a node and
+  sharding tensors across the fabric — costs far more than the hardware saves,
+  and is the usual reason a cluster this size underperforms.
+- Inter-node fabric: RDMA, InfiniBand or RoCE. The stage boundaries carry little
+  traffic compared with tensor-parallel all-reduces, but they are on the critical
+  path of every token, so latency matters more than raw bandwidth here.
+- What this buys over the earlier 8-GPU sizing is not speed but headroom: the
+  full-precision weights fit, KV cache stops being rationed, and long contexts
+  and concurrent sessions no longer trade against each other. An agentic client
+  driving WEFT is exactly the workload that cares — long tool-call transcripts,
+  several sessions at once.
+- Exact node counts, memory-per-stage arithmetic and fabric topology belong with
+  whoever owns the cluster; nothing above is a requirement WEFT imposes. The
+  server sees an HTTP endpoint and nothing else.
 - Serving: vLLM or SGLang (both expose an OpenAI-compatible endpoint and ship a K2 tool-call parser); SGLang is recommended for agentic workloads with structured output.
 - Agent bridge: OpenAI Agents SDK with overridden `base_url`, or a thin custom tool loop; it connects to the same Streamable HTTP endpoint — zero changes on the MCP server side.
 - Offline transfer: Podman image (`podman save/load`), pip wheels, BGE-M3 weights, tessdata, model weights for the inference cluster.
