@@ -12,6 +12,7 @@ from pathlib import Path
 
 from .. import podman
 from ..sandbox import CONTAINER_ROOT, container_path, resolve
+from . import header
 from . import verilog as verilog_extract
 from . import vhdl as vhdl_extract
 from .model import Module
@@ -101,7 +102,8 @@ def index_project(
         found.update(_vhdl(image, workspace, vhdl, report, timeout))
 
     for path, modules in found.items():
-        store.replace(path, digest(stale[path]), modules)
+        documented = [header.attach(m, stale[path]) for m in modules]
+        store.replace(path, digest(stale[path]), documented)
         report.parsed.append(path)
         report.modules += len(modules)
 

@@ -26,11 +26,13 @@ class Port:
     @name: port name
     @direction: "in", "out" or "inout"
     @type: type as the source declares it, width and all
+    @doc: the line the module's header gives for this port, or None
     """
 
     name: str
     direction: str
     type: str
+    doc: str | None = None
 
 
 @dataclass(frozen=True)
@@ -40,11 +42,13 @@ class Parameter:
     @name: parameter name
     @default: default value as written, or None when it has none
     @type: declared type, or None when the language did not require one
+    @doc: the line the module's header gives for this parameter, or None
     """
 
     name: str
     default: str | None = None
     type: str | None = None
+    doc: str | None = None
 
 
 @dataclass(frozen=True)
@@ -70,6 +74,8 @@ class Module:
     @file: path relative to the indexed directory
     @line: 1-based line where the declaration starts
     @ports / @parameters / @instances: in source order
+    @summary: the one-line summary from the module's own header, or None
+    @description: the prose below the header's field list, or None
     """
 
     name: str
@@ -79,3 +85,5 @@ class Module:
     ports: list[Port] = field(default_factory=list)
     parameters: list[Parameter] = field(default_factory=list)
     instances: list[Instance] = field(default_factory=list)
+    summary: str | None = None
+    description: str | None = None

@@ -14,7 +14,9 @@ module. Searching for the name is exact where adjacency is a guess.
 """
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+
+from .model import Module
 
 #: The line that opens a header: the module's own name, then its summary.
 _OPENING = r"^{name}\s+[-–]\s+(?P<summary>\S.*)$"
@@ -142,3 +144,30 @@ def _prose(body: list[str]) -> str | None:
     if current:
         paragraphs.append(" ".join(current))
     return "\n\n".join(paragraphs) or None
+
+
+def attach(module: Module, text: str) -> Module:
+    """attach - fill a module's documentation from its own header
+
+    @module: as the parser produced it
+    @text: the source file the module was found in
+
+    Ports and parameters are matched to header fields without regard to case,
+    because GHDL folds VHDL identifiers and the header is written by hand.
+
+    Return: the module with whatever the header said, or unchanged when it has
+    no header. A module without one is documented from the AST alone, which is
+    the honest outcome: the facts are still right and no prose is invented.
+    """
+    found = parse(text, module.name)
+    if found is None:
+        return module
+
+    fields = {name.lower(): value for name, value in found.fields.items()}
+    return replace(
+        module,
+        summary=found.summary,
+        description=found.description,
+        ports=[replace(p, doc=fields.get(p.name.lower()) or None) for p in module.ports],
+        parameters=[replace(p, doc=fields.get(p.name.lower()) or None) for p in module.parameters],
+    )

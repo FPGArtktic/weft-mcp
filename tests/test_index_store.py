@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Tests for the symbol index."""
 
+import sqlite3
 import threading
 
 import pytest
@@ -156,3 +157,33 @@ def test_the_store_works_from_another_thread(store):
     thread.start()
     thread.join()
     assert seen["name"] == "seven_seg_decoder"
+
+
+def test_an_older_database_gains_the_documentation_columns(tmp_path):
+    """A database written before headers were read must not have to be rebuilt."""
+    database = tmp_path / "symbols.sqlite"
+    old = sqlite3.connect(database)
+    old.executescript(
+        "CREATE TABLE files (path TEXT PRIMARY KEY, hash TEXT NOT NULL);"
+        "CREATE TABLE modules (name TEXT NOT NULL, folded TEXT NOT NULL,"
+        " language TEXT NOT NULL, file TEXT NOT NULL, line INTEGER NOT NULL,"
+        " PRIMARY KEY (folded, file));"
+        "CREATE TABLE ports (module TEXT NOT NULL, file TEXT NOT NULL,"
+        " ordinal INTEGER NOT NULL, name TEXT NOT NULL, direction TEXT NOT NULL,"
+        " type TEXT NOT NULL);"
+        "CREATE TABLE parameters (module TEXT NOT NULL, file TEXT NOT NULL,"
+        " ordinal INTEGER NOT NULL, name TEXT NOT NULL, value TEXT, type TEXT);"
+        "CREATE TABLE instances (module TEXT NOT NULL, file TEXT NOT NULL,"
+        " ordinal INTEGER NOT NULL, name TEXT NOT NULL, of TEXT NOT NULL,"
+        " of_folded TEXT NOT NULL, line INTEGER NOT NULL);"
+    )
+    old.execute("INSERT INTO files VALUES ('a.sv', 'deadbeef')")
+    old.execute("INSERT INTO modules VALUES ('old', 'old', 'systemverilog', 'a.sv', 1)")
+    old.commit()
+    old.close()
+
+    store = SymbolStore(database)
+    module = store.module("old")
+    assert module is not None
+    assert module.summary is None
+    assert store.unchanged("a.sv", "deadbeef")

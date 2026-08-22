@@ -29,11 +29,13 @@ CREATE TABLE IF NOT EXISTS files (
     hash      TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS modules (
-    name      TEXT NOT NULL,
-    folded    TEXT NOT NULL,
-    language  TEXT NOT NULL,
-    file      TEXT NOT NULL,
-    line      INTEGER NOT NULL,
+    name        TEXT NOT NULL,
+    folded      TEXT NOT NULL,
+    language    TEXT NOT NULL,
+    file        TEXT NOT NULL,
+    line        INTEGER NOT NULL,
+    summary     TEXT,
+    description TEXT,
     PRIMARY KEY (folded, file)
 );
 CREATE TABLE IF NOT EXISTS ports (
@@ -42,7 +44,8 @@ CREATE TABLE IF NOT EXISTS ports (
     ordinal   INTEGER NOT NULL,
     name      TEXT NOT NULL,
     direction TEXT NOT NULL,
-    type      TEXT NOT NULL
+    type      TEXT NOT NULL,
+    doc       TEXT
 );
 CREATE TABLE IF NOT EXISTS parameters (
     module    TEXT NOT NULL,
@@ -50,7 +53,8 @@ CREATE TABLE IF NOT EXISTS parameters (
     ordinal   INTEGER NOT NULL,
     name      TEXT NOT NULL,
     value     TEXT,
-    type      TEXT
+    type      TEXT,
+    doc       TEXT
 );
 CREATE TABLE IF NOT EXISTS instances (
     module    TEXT NOT NULL,
@@ -64,6 +68,16 @@ CREATE TABLE IF NOT EXISTS instances (
 CREATE INDEX IF NOT EXISTS modules_folded ON modules (folded);
 CREATE INDEX IF NOT EXISTS instances_module ON instances (module, file);
 """
+
+#: Columns that arrived after the first databases were written. SQLite has
+#: no ADD COLUMN IF NOT EXISTS, so an index built by an older WEFT is
+#: brought forward here rather than being thrown away and re-parsed.
+LATER_COLUMNS = (
+    ("modules", "summary", "TEXT"),
+    ("modules", "description", "TEXT"),
+    ("ports", "doc", "TEXT"),
+    ("parameters", "doc", "TEXT"),
+)
 
 
 @dataclass(frozen=True)
@@ -102,6 +116,7 @@ class SymbolStore:
         self._database.parent.mkdir(parents=True, exist_ok=True)
         self._local = threading.local()
         self._db.executescript(SCHEMA)
+        self._migrate()
 
     @property
     def _db(self) -> sqlite3.Connection:
@@ -113,6 +128,13 @@ class SymbolStore:
             connection.execute("PRAGMA journal_mode=WAL")
             self._local.connection = connection
         return connection
+
+    def _migrate(self) -> None:
+        """_migrate - add the columns a database written by an older WEFT lacks."""
+        for table, column, type_ in LATER_COLUMNS:
+            present = {r["name"] for r in self._db.execute(f"PRAGMA table_info({table})")}
+            if column not in present:
+                self._db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {type_}")
 
     def close(self) -> None:
         """close - release this thread's handle."""
@@ -139,23 +161,32 @@ class SymbolStore:
         self._forget(path)
         for module in modules:
             self._db.execute(
-                "INSERT OR REPLACE INTO modules (name, folded, language, file, line)"
-                " VALUES (?,?,?,?,?)",
-                (module.name, module.name.lower(), module.language, path, module.line),
+                "INSERT OR REPLACE INTO modules"
+                " (name, folded, language, file, line, summary, description)"
+                " VALUES (?,?,?,?,?,?,?)",
+                (
+                    module.name,
+                    module.name.lower(),
+                    module.language,
+                    path,
+                    module.line,
+                    module.summary,
+                    module.description,
+                ),
             )
             self._db.executemany(
-                "INSERT INTO ports (module, file, ordinal, name, direction, type)"
-                " VALUES (?,?,?,?,?,?)",
+                "INSERT INTO ports (module, file, ordinal, name, direction, type, doc)"
+                " VALUES (?,?,?,?,?,?,?)",
                 [
-                    (module.name, path, i, p.name, p.direction, p.type)
+                    (module.name, path, i, p.name, p.direction, p.type, p.doc)
                     for i, p in enumerate(module.ports)
                 ],
             )
             self._db.executemany(
-                "INSERT INTO parameters (module, file, ordinal, name, value, type)"
-                " VALUES (?,?,?,?,?,?)",
+                "INSERT INTO parameters (module, file, ordinal, name, value, type, doc)"
+                " VALUES (?,?,?,?,?,?,?)",
                 [
-                    (module.name, path, i, p.name, p.default, p.type)
+                    (module.name, path, i, p.name, p.default, p.type, p.doc)
                     for i, p in enumerate(module.parameters)
                 ],
             )
@@ -283,13 +314,13 @@ class SymbolStore:
         """_build - a Module and its children, from a modules row."""
         name, file = row["name"], row["file"]
         ports = [
-            Port(r["name"], r["direction"], r["type"])
+            Port(r["name"], r["direction"], r["type"], r["doc"])
             for r in self._db.execute(
                 "SELECT * FROM ports WHERE module = ? AND file = ? ORDER BY ordinal", (name, file)
             )
         ]
         parameters = [
-            Parameter(r["name"], r["value"], r["type"])
+            Parameter(r["name"], r["value"], r["type"], r["doc"])
             for r in self._db.execute(
                 "SELECT * FROM parameters WHERE module = ? AND file = ? ORDER BY ordinal",
                 (name, file),
@@ -310,6 +341,8 @@ class SymbolStore:
             ports=ports,
             parameters=parameters,
             instances=instances,
+            summary=row["summary"],
+            description=row["description"],
         )
 
     def _branch(self, name: str, seen: set[str], depth: int) -> dict:
