@@ -4,7 +4,7 @@
 
 [![ci](https://github.com/FPGArtktic/weft-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/FPGArtktic/weft-mcp/actions/workflows/ci.yml)
 [![container](https://github.com/FPGArtktic/weft-mcp/actions/workflows/container.yml/badge.svg)](https://github.com/FPGArtktic/weft-mcp/actions/workflows/container.yml)
-[![docs](https://readthedocs.org/projects/weft-mcp/badge/?version=latest)](https://weft-mcp.readthedocs.io/en/latest/)
+[![docs](https://readthedocs.org/projects/weft-mcp/badge/?version=main)](https://weft-mcp.readthedocs.io/en/main/)
 [![python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](pyproject.toml)
 [![latest tag](https://img.shields.io/github/v/tag/FPGArtktic/weft-mcp)](https://github.com/FPGArtktic/weft-mcp/tags)
 [![licence: GPL-3.0-only](https://img.shields.io/badge/licence-GPL--3.0--only-blue.svg)](COPYING)
@@ -99,7 +99,7 @@ Nothing reaches the network at runtime, and nothing reports telemetry.
 The full design — every tool's arguments and return shape, the milestones,
 and the reasoning behind the awkward parts — is in [PROJECT.md](PROJECT.md).
 
-The manual is at **[weft-mcp.readthedocs.io](https://weft-mcp.readthedocs.io/en/latest/)**,
+The manual is at **[weft-mcp.readthedocs.io](https://weft-mcp.readthedocs.io/en/main/)**,
 built with Sphinx from [`Documentation/`](Documentation/). Its tool reference
 and configuration reference are generated from the code on every build, so
 neither can drift from what the server actually accepts — a key added without
@@ -174,7 +174,7 @@ the first time.
 WEFT reads one TOML file, found at `--config`, then `$WEFT_CONFIG`, then
 `~/.config/weft/weft.toml`. Only `[workspace]` is required. Every key is
 documented in the
-[configuration reference](https://weft-mcp.readthedocs.io/en/latest/configuration.html),
+[configuration reference](https://weft-mcp.readthedocs.io/en/main/configuration.html),
 generated from the loader itself.
 
 ```toml

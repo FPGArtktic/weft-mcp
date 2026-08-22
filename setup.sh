@@ -140,7 +140,7 @@ else
     mkdir -p "$(dirname "$CONFIG")"
     {
         echo "# Written by setup.sh. Every key is documented at"
-        echo "# https://weft-mcp.readthedocs.io/en/latest/configuration.html"
+        echo "# https://weft-mcp.readthedocs.io/en/main/configuration.html"
         echo
         echo "[workspace]"
         echo "# Nothing outside this directory can be read or written."
