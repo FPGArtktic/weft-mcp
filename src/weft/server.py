@@ -26,7 +26,8 @@ from .jobs import JobStore
 from .quartus import flow, project, reports
 from .quartus.install import Install, InstallError, probe
 from .rag import chunk, ingest
-from .rag.store import TEXT, DocumentStore
+from .rag.embed import Embedder, EmbedError
+from .rag.store import TEXT, VECTOR, DocumentStore
 from .sandbox import resolve
 
 #: A tool result stays small enough for a client to read without paging.
@@ -78,6 +79,40 @@ class Installs:
                 raise InstallError(f"no [quartus.{name}] section in the configuration")
             self._known[name] = probe(entry.root, entry.env)
         return self._known[name]
+
+
+class Embeddings:
+    """The embedding model named in the configuration, loaded on first use.
+
+    Loading costs seconds and a couple of gigabytes, so it happens when
+    something is actually embedded rather than at startup: a server used only
+    for linting should never pay for it. With no model configured, encode
+    returns nothing and retrieval stays textual.
+    """
+
+    def __init__(self, config: Config):
+        self._path = config.rag_model
+        self._embedder: Embedder | None = None
+        self._failed: str | None = None
+
+    def encode(self, texts: list[str]) -> list[list[float]]:
+        """encode - vectors for @texts, or an empty list without a model
+
+        Raises EmbedError if a model is configured but cannot be loaded. A
+        misconfigured model is a mistake to report, not one to work around by
+        quietly falling back to a different kind of search.
+        """
+        if self._path is None:
+            return []
+        if self._failed is not None:
+            raise EmbedError(self._failed)
+        if self._embedder is None:
+            try:
+                self._embedder = Embedder(self._path)
+            except EmbedError as e:
+                self._failed = str(e)
+                raise
+        return self._embedder.encode(texts)
 
 
 class StaticTokenVerifier:
@@ -436,6 +471,7 @@ def build(config: Config) -> MCPServer:
         return tree
 
     documents = DocumentStore(config.workspace / STATE_DIR / "documents.sqlite")
+    embedder = Embeddings(config)
 
     @server.tool(
         description=(
@@ -458,6 +494,7 @@ def build(config: Config) -> MCPServer:
         """
         pages = ingest.extract(config.image, config.workspace, path, language=language)
         pieces = chunk.chunks(pages)
+        vectors = embedder.encode([c.text for c in pieces])
         stored = documents.add(
             path,
             pieces,
@@ -465,10 +502,11 @@ def build(config: Config) -> MCPServer:
             ocr_pages=sum(1 for p in pages if p.ocr),
             designation=chunk.designation(pages),
             doc_type=doc_type,
+            vectors=vectors,
         )
         return asdict(stored) | {
             "clauses": sum(1 for c in pieces if c.clause),
-            "retrieval": TEXT,
+            "retrieval": VECTOR if vectors else TEXT,
         }
 
     @server.tool(
@@ -489,9 +527,16 @@ def build(config: Config) -> MCPServer:
 
         Return: the passages, and the retrieval method that found them.
         """
-        found = documents.search_text(query, limit=top_k, doc_type=doc_type)
+        wanted = embedder.encode([query])
+        if wanted and documents.vectors_available:
+            found = documents.search_vector(wanted[0], limit=top_k, doc_type=doc_type)
+            method = VECTOR
+        else:
+            found = documents.search_text(query, limit=top_k, doc_type=doc_type)
+            method = TEXT
+
         return {
-            "retrieval": TEXT,
+            "retrieval": method,
             "count": len(found),
             "passages": [asdict(p) for p in found],
         }
