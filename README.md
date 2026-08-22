@@ -22,7 +22,7 @@ WEFT is under construction, milestone by milestone. What is finished today:
 | Quartus compilation | working — `start_compile` as a persistent job, `get_job_status`, `get_job_log`, `cancel_job` |
 | `parse_reports` | working — resources, timing per clock, ranked messages |
 | Source indexing | working — `index_project`, `get_module_info`, `get_hierarchy`, `search_code` |
-| Document RAG with OCR | not yet |
+| Document RAG with OCR | working — `index_document`, `search_docs`, `list_indexed_docs`; clause-level citations |
 | Documentation generation | not yet |
 | Device programming | not yet |
 
@@ -170,6 +170,11 @@ env = { LM_LICENSE_FILE = "1800@licence-server" }
 [jobs]
 timeout_s = 7200
 
+[rag]
+# Local BGE-M3 weights in ONNX form. Omit the key and document search still
+# works, by text rather than by meaning.
+model_path = "/home/you/.local/share/weft/models/bge-m3"
+
 [http]
 host = "127.0.0.1"
 port = 8080
@@ -227,6 +232,41 @@ Building that deployment — the inference cluster, the serving stack, carrying
 the image and the wheels across the gap — is not part of this repository.
 Appendix A of [PROJECT.md](PROJECT.md) records what it would take and stops
 there, deliberately.
+
+## Reading your own documents
+
+`index_document` takes a PDF and makes it searchable. Pages with a text layer
+are extracted directly; only pages that come back empty — a scan — are rendered
+and passed to Tesseract, so a born-digital 1300-page standard is indexed in
+seconds rather than an hour of pointless OCR.
+
+The document is cut at its **own headings**, not into fixed-size windows, so a
+result cites `1800-2017 §9.2.2.4` and you can look that up. A window number
+could not be checked against anything.
+
+Search is semantic when an embedding model is configured and textual when it is
+not, and the result says which one answered — a ranking that came from a
+substring match must not be mistaken for one that came from meaning. The
+difference is real: against the SystemVerilog standard, "weighted random
+selection" finds §18.16 *randcase* by meaning and finds nothing at all by text,
+because those three words do not appear in it.
+
+**No model ships with WEFT.** BGE-M3 is MIT-licensed and about 2 GB; you fetch
+it once, point `model_path` at it, and nothing touches the network again:
+
+```bash
+DIR=~/.local/share/weft/models/bge-m3
+mkdir -p $DIR/onnx
+for f in onnx/model.onnx onnx/model.onnx_data tokenizer.json; do
+    curl -Lo $DIR/$f https://huggingface.co/BAAI/bge-m3/resolve/main/$f
+done
+```
+
+Point `model_path` at `$DIR`. The graph is small; `model.onnx_data` beside it
+holds the weights and is the 2 GB.
+
+Documents are yours and stay yours. WEFT ships no standards, no handbooks and
+no vendor documentation, and the index it builds never leaves your workspace.
 
 ## The demo project
 
