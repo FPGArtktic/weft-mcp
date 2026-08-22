@@ -119,7 +119,15 @@ def _configuration() -> str:
         title = "Top level" if table == "top level" else f"`[{table}]`"
         lines += [f"## {title}", "", *[f"- `{key}`" for key in keys], ""]
 
-    lines += ["## Reference", "", "```{eval-rst}", ".. literalinclude:: example.toml", "   :language: toml", "```", ""]
+    lines += [
+        "## A complete example",
+        "",
+        "```{eval-rst}",
+        ".. literalinclude:: example.toml",
+        "   :language: toml",
+        "```",
+        "",
+    ]
     return "\n".join(lines) + "\n"
 
 
