@@ -4,7 +4,10 @@
 
 [![ci](https://github.com/FPGArtktic/weft-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/FPGArtktic/weft-mcp/actions/workflows/ci.yml)
 [![docs](https://readthedocs.org/projects/weft-mcp/badge/?version=latest)](https://weft-mcp.readthedocs.io/en/latest/)
+[![python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](pyproject.toml)
+[![latest tag](https://img.shields.io/github/v/tag/FPGArtktic/weft-mcp)](https://github.com/FPGArtktic/weft-mcp/tags)
 [![licence: GPL-3.0-only](https://img.shields.io/badge/licence-GPL--3.0--only-blue.svg)](COPYING)
+[![Contributor Covenant 2.1](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](CODE_OF_CONDUCT.md)
 
 An MCP server that gives an LLM client a safe, structured interface to an
 Intel Quartus Prime 25.1 FPGA flow: lint and simulate in seconds, compile
@@ -120,6 +123,15 @@ sudo pacman -S --needed podman python git
 
 git clone https://github.com/FPGArtktic/weft-mcp.git
 cd weft-mcp
+./setup.sh
+```
+
+`setup.sh` builds the image, installs the package, finds your Quartus and
+Questa, writes a starter configuration and prints the command to register the
+server. `./setup.sh --check` reports what it would find and changes nothing.
+The manual equivalent is:
+
+```bash
 podman build -t weft-tools -f containers/Containerfile.weft-tools .
 pip install --user .
 ```
@@ -132,8 +144,7 @@ sudo apt install podman uidmap python3 python3-pip git
 
 git clone https://github.com/FPGArtktic/weft-mcp.git
 cd weft-mcp
-podman build -t weft-tools -f containers/Containerfile.weft-tools .
-pip install --user .
+./setup.sh
 ```
 
 `uidmap` is only a *Recommends* of `podman`, so a plain `apt install` pulls it
@@ -222,34 +233,100 @@ instead of silently doing nothing.
 
 ## Running
 
-Local client, over stdio:
+The fastest way in, if you cloned the repository:
 
 ```bash
-weft --transport stdio
+./setup.sh
 ```
 
-For Claude Desktop or Claude Code, register it as an MCP server:
+It checks what is on the machine, builds the container image, installs the
+package, writes a starter `weft.toml` with whatever Quartus and Questa it
+found, and prints the exact command to register the server. It never installs
+Quartus — that is yours to install and licence — and `./setup.sh --check`
+reports what is present without changing anything.
+
+Or by hand:
+
+```bash
+weft --transport stdio        # a local client
+weft --transport http         # on the LAN, behind a bearer token
+```
+
+### Registering it with a client
+
+Running `weft` in a terminal on its own does nothing useful. It speaks MCP over
+its standard input, so a client has to start it. Where you put that instruction
+depends on the client.
+
+**Claude Code**, the CLI. One command, no file to edit:
+
+```bash
+claude mcp add --scope user weft -- \
+    ~/.local/bin/weft --transport stdio --config ~/.config/weft/weft.toml
+```
+
+The `--` matters: everything after it is the command Claude Code runs, not an
+argument to `claude mcp add`. `--scope user` makes the server available in every
+project; `--scope project` writes a `.mcp.json` in the current directory instead,
+which is what you commit so your colleagues get the same server. Then:
+
+```bash
+claude mcp list        # is it there, and did it connect
+claude mcp get weft    # why did it not
+```
+
+Inside a session, `/mcp` shows the same thing.
+
+**Claude Desktop**. Edit its configuration file — the app does not have a
+command for this:
+
+| | |
+|---|---|
+| Linux | `~/.config/Claude/claude_desktop_config.json` |
+| macOS | `~/Library/Application Support/Claude/claude_desktop_config.json` |
+| Windows | `%APPDATA%\Claude\claude_desktop_config.json` |
 
 ```json
 {
   "mcpServers": {
     "weft": {
-      "command": "weft",
+      "command": "/home/you/.local/bin/weft",
       "args": ["--transport", "stdio", "--config", "/home/you/.config/weft/weft.toml"]
     }
   }
 }
 ```
 
-On the LAN, over Streamable HTTP:
+Use the **absolute path** to the binary. Claude Desktop does not inherit your
+shell's `PATH`, so `"command": "weft"` works from your terminal and fails from
+the app, which is the single most common reason a server never appears. Restart
+the app after editing; it reads the file at startup and not again.
+
+**Over HTTP**, once the server is running somewhere with a token configured:
 
 ```bash
-weft --transport http
+claude mcp add --transport http --header "Authorization: Bearer YOUR_TOKEN" \
+    weft https://your-host.example.com/mcp
 ```
 
-Every request must carry `Authorization: Bearer <token>`; anything else gets a
-401. Set a real token in the configuration — the HTTP transport refuses to
-start without one.
+Every request must carry that header; anything else gets a 401. Set a real
+token in the configuration — the HTTP transport refuses to start without one.
+
+### When the server does not appear
+
+In order of how often it is actually the cause:
+
+1. **The path is not absolute**, and the client's `PATH` does not have
+   `~/.local/bin` in it. Run `command -v weft` and paste what it prints.
+2. **You added it in the wrong scope.** `claude mcp add` without `--scope`
+   registers it for the current directory only. `claude mcp list` from another
+   project will not show it.
+3. **The configuration is wrong**, and WEFT said so and exited. Run the same
+   command by hand — `weft --transport stdio --config ...` — and read the error.
+   A misspelled key is refused by name, not ignored.
+4. **The JSON is malformed.** Claude Desktop fails silently on this. Its logs
+   are in `~/Library/Logs/Claude/` on macOS and `%APPDATA%\Claude\logs` on
+   Windows.
 
 ### Why there is an HTTP transport at all
 
@@ -562,6 +639,22 @@ able to reproduce it.
 
 Everything else — lint, simulate, compile, parse, index, retrieve, document —
 was run against the actual tools, not mocked, before it was called working.
+
+## What CI checks
+
+Every push runs three jobs: `ruff` for style, `pytest` on Python 3.11, 3.12 and
+3.13, and a Sphinx build with warnings as errors — which is what makes the
+generated tool and configuration references worth anything, since a key added
+without a description fails the build rather than shipping a reference that is
+quietly incomplete.
+
+The eighteen tests that need the `weft-tools` image are not in that run. They
+skip themselves when the image is absent, and building it compiles GHDL from
+source. A separate `container` workflow builds it for real and runs them where
+a break would mean something: when the Containerfile or the code driving it
+changes, weekly because Arch is a rolling release, and on demand. It also
+asserts that the tests actually *ran* — a run where they all skipped would
+otherwise pass having tested nothing.
 
 ## Contributing
 
