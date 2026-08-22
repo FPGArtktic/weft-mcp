@@ -212,6 +212,20 @@ Every request must carry `Authorization: Bearer <token>`; anything else gets a
 401. Set a real token in the configuration — the HTTP transport refuses to
 start without one.
 
+### Why there is an HTTP transport at all
+
+A local client does not need one; stdio is simpler and has no token to leak.
+HTTP exists because it is the hand-off point for running this behind a model
+you host yourself, on a network with no way out. Such a model, served behind
+an OpenAI-compatible endpoint, talks to the same `/mcp` endpoint, and nothing
+on the server side changes. WEFT already makes no network calls at runtime, so
+an installed server needs nothing further.
+
+Building that deployment — the inference cluster, the serving stack, carrying
+the image and the wheels across the gap — is not part of this repository.
+Appendix A of [PROJECT.md](PROJECT.md) records what it would take and stops
+there, deliberately.
+
 ## The demo project
 
 [`examples/counter/`](examples/counter/) is a small MAX 10 counter written in
