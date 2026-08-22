@@ -22,3 +22,9 @@ output_files/
 simulation/
 *.qws
 .weft/
+
+# Documentation generated at build time from the code; committing it
+# would mean a diff on every build and a copy that can go stale.
+Documentation/_build/
+Documentation/tools.md
+Documentation/configuration.md

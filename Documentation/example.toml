@@ -1,0 +1,52 @@
+# SPDX-License-Identifier: GPL-3.0-only
+#
+# A complete WEFT configuration. Every section but [workspace] is optional:
+# a machine with no Quartus still lints and simulates, and one with no
+# embedding model still retrieves documents by text.
+
+[workspace]
+# Nothing outside this directory can be read or written, on the host or
+# inside the container.
+root = "/home/you/fpga"
+
+[container]
+image = "weft-tools"
+
+[quartus]
+edition = "lite"          # omit when only one edition is configured
+
+[quartus.lite]
+root = "/home/you/altera_lite/25.1std/quartus"
+
+[quartus.pro]
+root = "/opt/intelFPGA_pro/25.1/quartus"
+# FlexLM variables are passed through to every Pro invocation.
+env = { LM_LICENSE_FILE = "1800@licence-server" }
+
+[questa]
+# The simulator that ships beside Quartus. It reads Verilog, SystemVerilog
+# and VHDL in one run, which no open simulator does, so it is what simulates
+# a mixed-language design whole. Never a default: ask for it by name.
+root = "/home/you/altera_lite/25.1std/questa_fse"
+env = { SALT_LICENSE_SERVER = ";/home/you/.altera.quartus/questa_lic.dat" }
+
+[jobs]
+timeout_s = 7200
+
+[rag]
+# Where your PDFs live. Mounted read-only, and separate from the workspace
+# because a document collection outlives any one project.
+library = "/home/you/Documents/fpga-docs"
+
+# Local BGE-M3 weights in ONNX form. Without them, document search still
+# works -- by text rather than by meaning.
+model_path = "/home/you/.local/share/weft/models/bge-m3"
+
+# Put the index somewhere shared to index a library once and search it from
+# every project.
+database = "/home/you/.local/share/weft/documents.sqlite"
+
+[http]
+host = "127.0.0.1"
+port = 8080
+token = "put-a-long-random-string-here"

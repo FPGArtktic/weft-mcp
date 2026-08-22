@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: GPL-3.0-only
+#
+# Read the Docs build. The documentation is built with Sphinx and MyST so that
+# the Markdown already in the repository -- README, PROJECT.md, CHANGELOG --
+# is included rather than copied: a manual that repeats the README drifts from
+# it, and the copy is always the one that is wrong.
+
+version: 2
+
+build:
+  os: ubuntu-24.04
+  tools:
+    python: "3.12"
+
+sphinx:
+  configuration: Documentation/conf.py
+  fail_on_warning: true
+
+python:
+  install:
+    - method: pip
+      path: .
+      extra_requirements:
+        - docs
+
+# No pdf or epub. Both need a LaTeX toolchain this project has never built
+# against, and fail_on_warning above would turn an untested format into a
+# failed build of the documentation that does work.
+formats: []

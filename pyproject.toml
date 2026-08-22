@@ -38,6 +38,16 @@ weft = "weft.server:main"
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.6"]
 
+# Documentation build, used by Read the Docs and by `sphinx-build Documentation`.
+# None of it is needed to run the server.
+docs = [
+    "sphinx>=8",
+    "myst-parser>=4",
+    "furo>=2024.8",
+    "sphinx-copybutton>=0.5",
+    "linkify-it-py>=2",
+]
+
 [tool.setuptools.dynamic]
 version = { attr = "weft.__version__" }
 

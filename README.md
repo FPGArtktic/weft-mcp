@@ -91,6 +91,12 @@ Nothing reaches the network at runtime, and nothing reports telemetry.
 The full design — every tool's arguments and return shape, the milestones,
 and the reasoning behind the awkward parts — is in [PROJECT.md](PROJECT.md).
 
+The manual is built with Sphinx from [`Documentation/`](Documentation/) and
+published on Read the Docs. Its tool reference and configuration reference
+are generated from the code on every build, so neither can drift from what
+the server actually accepts. Build it yourself with
+`pip install -e '.[docs]' && sphinx-build -W Documentation _build`.
+
 ## Requirements
 
 - **Quartus Prime 25.1** (Lite, Standard or Pro) installed and licensed by you
