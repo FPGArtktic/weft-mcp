@@ -1,0 +1,69 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# weft-tools - every external binary WEFT executes, except Quartus itself.
+#
+# The project never ships this image: each user builds it locally, so WEFT
+# distributes only its own GPL-2.0-only code and never an aggregate of
+# third-party binaries under mixed licences (PROJECT.md 5.2 and 7).
+#
+#     podman build -t weft-tools -f containers/Containerfile.weft-tools .
+#
+# Building is the only step that needs network access. At runtime WEFT starts
+# the image with --network=none and mounts nothing but the workspace.
+
+# --------------------------------------------------------------------------- #
+# Builder stage - the three packages that are not in the official Arch repos.
+# The AUR helper and the whole build toolchain stay here; the final image gets
+# the resulting packages and nothing else.
+# --------------------------------------------------------------------------- #
+FROM archlinux:base AS builder
+
+# makepkg refuses to run as root, so AUR work happens as an unprivileged user
+# allowed to call pacman without a password.
+RUN pacman -Syu --noconfirm --needed base-devel git sudo \
+ && useradd -m -G wheel builder \
+ && printf '%%wheel ALL=(ALL) NOPASSWD: ALL\n' > /etc/sudoers.d/wheel
+
+USER builder
+WORKDIR /home/builder
+
+# yay-bin ships an upstream binary, so bringing in the helper costs no Go
+# toolchain and no second bootstrap build.
+RUN git clone --depth 1 https://aur.archlinux.org/yay-bin.git \
+ && cd yay-bin \
+ && makepkg --noconfirm --syncdeps --install \
+ && cd .. && rm -rf yay-bin
+
+# ghdl          GPL-2.0-only, mcode backend, built from source.
+# verible-bin   Apache-2.0. Upstream release binaries on purpose: building
+#               Verible from source pulls in Bazel and takes roughly half an
+#               hour, which is not a fair thing to ask of every user.
+# python-cocotb BSD-3-Clause, needed by the simulate path.
+RUN yay -S --noconfirm --needed --removemake \
+        --answerclean None --answerdiff None --answeredit None \
+        ghdl verible-bin python-cocotb
+
+# Hand the built packages to the final stage.
+RUN mkdir -p /home/builder/pkgs \
+ && find /home/builder/.cache/yay -name '*.pkg.tar.zst' -exec cp -t /home/builder/pkgs {} + \
+ && test -n "$(ls -A /home/builder/pkgs)" 
+
+# --------------------------------------------------------------------------- #
+# Final stage - runtime only.
+# --------------------------------------------------------------------------- #
+FROM archlinux:base
+
+COPY --from=builder /home/builder/pkgs /tmp/pkgs
+
+# gcc-ada is GHDL's runtime dependency (libgnat), not a build-only one.
+RUN pacman -Syu --noconfirm --needed \
+        verilator \
+        iverilog \
+        gcc-ada \
+        tesseract tesseract-data-eng tesseract-data-pol \
+        poppler \
+        python \
+ && pacman -U --noconfirm /tmp/pkgs/*.pkg.tar.zst \
+ && rm -rf /tmp/pkgs /var/cache/pacman/pkg/* /var/lib/pacman/sync/*
+
+WORKDIR /work
