@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "weft"
-version = "0.4.0"
+dynamic = ["version"]
 description = "WEFT Elaborates FPGA Toolchains - an MCP server for the Intel Quartus Prime flow"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -37,6 +37,9 @@ weft = "weft.server:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.6"]
+
+[tool.setuptools.dynamic]
+version = { attr = "weft.__version__" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
