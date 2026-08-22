@@ -108,7 +108,19 @@ The primary client is Claude (Desktop / Code) over MCP stdio or Streamable HTTP.
 
 ### 5.3 RAG runtime
 - Embedding and retrieval run in the server process; no dedicated container. Document *ingestion* (PDF text extraction and OCR) is delegated to `weft-tools`, so the host needs no Tesseract or Poppler.
-- BGE-M3 via FlagEmbedding/sentence-transformers, CPU by default, CUDA if available.
+- BGE-M3 through **ONNX Runtime** (MIT), CPU by default. Not FlagEmbedding: it
+  declares no licence at all in its metadata, which grants nothing and is a
+  harder bar than an incompatible licence, and it hard-requires torch,
+  transformers, datasets, accelerate, peft and sentencepiece. ONNX Runtime
+  needs none of them and has wheels for the interpreters this runs on.
+- The embedding runtime is a library, not a program WEFT executes, so the rule
+  in §5.2 does not reach it and there is nothing to gain by containerising it:
+  sqlite-vec has to live in the server process because it is the store, and
+  moving only the embedder would mean marshalling text in and vectors out for
+  every chunk and mounting the model weights into the container as well. The
+  licence argument that puts GHDL and Verible in `weft-tools` does not apply
+  here either, because this stack is MIT throughout — sqlite-vec is dual
+  MIT/Apache-2.0, and MIT is the one taken.
 - sqlite-vec database file in the workspace; separate tables for docs, code, and generated documentation.
 
 ## 6. Non-functional requirements
