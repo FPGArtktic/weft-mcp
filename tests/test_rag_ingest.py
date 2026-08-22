@@ -21,8 +21,8 @@ def canned(monkeypatch):
     def install(*outputs):
         queued = list(outputs)
 
-        def fake_run(image, workspace, argv, timeout=None):
-            calls.append(argv)
+        def fake_run(image, workspace, argv, timeout=None, readonly=False):
+            calls.append((argv, readonly))
             code, text = queued.pop(0)
             return podman.Result(code, text)
 
@@ -60,7 +60,14 @@ def test_a_page_without_a_text_layer_is_recognised(image, tmp_path, canned):
     got = extract(image, tmp_path, "doc.pdf")
     assert [p.ocr for p in got] == [False, True, False]
     assert got[1].text.strip() == "recovered by ocr"
-    assert "tesseract" in " ".join(calls[1])
+    assert "tesseract" in " ".join(calls[1][0])
+
+
+def test_the_library_is_never_mounted_writable(image, tmp_path, canned):
+    """Indexing a collection of PDFs must not be able to change it."""
+    calls = canned((0, "\f"), (0, "===weft-page=== 1\nrecognised\n"))
+    extract(image, tmp_path, "doc.pdf")
+    assert [readonly for _, readonly in calls] == [True, True]
 
 
 def test_no_ocr_run_when_every_page_has_text(image, tmp_path, canned):
@@ -72,7 +79,7 @@ def test_no_ocr_run_when_every_page_has_text(image, tmp_path, canned):
 def test_the_ocr_language_is_passed_through(image, tmp_path, canned):
     calls = canned((0, "\f"), (0, "===weft-page=== 1\nsomething\n"))
     extract(image, tmp_path, "doc.pdf", language="pol")
-    assert "-l pol" in " ".join(calls[1])
+    assert "-l pol" in " ".join(calls[1][0])
 
 
 def test_a_page_ocr_could_not_read_keeps_its_place(image, tmp_path, canned):

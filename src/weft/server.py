@@ -482,14 +482,14 @@ def build(config: Config) -> MCPServer:
     ) -> dict[str, Any]:
         """index_document - read a document into the retrieval store
 
-        @path: workspace-relative path to the PDF
+        @path: path to the PDF, relative to the configured document library
         @doc_type: your label -- standard, handbook, user_guide -- for filtering
         @language: Tesseract language for pages that need OCR
 
         Return: what was indexed, including how many pages needed OCR and how
         many chunks carry a clause number.
         """
-        pages = ingest.extract(config.image, config.workspace, path, language=language)
+        pages = ingest.extract(config.image, config.rag_library, path, language=language)
         pieces = chunk.chunks(pages)
         vectors = embedder.encode([c.text for c in pieces])
         stored = documents.add(

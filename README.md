@@ -171,9 +171,18 @@ env = { LM_LICENSE_FILE = "1800@licence-server" }
 timeout_s = 7200
 
 [rag]
+# Where your PDFs live. Mounted read-only, and separate from the workspace
+# because a document collection outlives any one project. Defaults to the
+# workspace when omitted.
+library = "/home/you/Documents/fpga-docs"
+
 # Local BGE-M3 weights in ONNX form. Omit the key and document search still
 # works, by text rather than by meaning.
 model_path = "/home/you/.local/share/weft/models/bge-m3"
+
+# The index itself. Defaults to <workspace>/.weft/documents.sqlite; put it
+# somewhere shared to index a library once and use it from every project.
+database = "/home/you/.local/share/weft/documents.sqlite"
 
 [http]
 host = "127.0.0.1"
@@ -235,7 +244,14 @@ there, deliberately.
 
 ## Reading your own documents
 
-`index_document` takes a PDF and makes it searchable. Pages with a text layer
+Your PDFs go in the directory `[rag] library` points at — **not** in the
+workspace. Standards and vendor handbooks are a personal library that outlives
+any one project, and forcing a copy into every project tree would be absurd.
+That directory is mounted **read-only**, so indexing cannot write anything into
+your collection, and the index lands wherever `[rag] database` says. Point the
+database at a shared path and one library serves every project.
+
+`index_document` takes a PDF from there and makes it searchable. Pages with a text layer
 are extracted directly; only pages that come back empty — a scan — are rendered
 and passed to Tesseract, so a born-digital 1300-page standard is indexed in
 seconds rather than an hour of pointless OCR.

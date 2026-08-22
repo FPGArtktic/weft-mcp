@@ -61,6 +61,18 @@ def test_state_files_can_be_placed_elsewhere(tmp_path):
     assert cfg.rag_db == Path("/var/lib/weft/documents.sqlite")
 
 
+def test_the_document_library_defaults_to_the_workspace(tmp_path):
+    cfg = load(write(tmp_path, '[workspace]\nroot = "@WS@"\n'))
+    assert cfg.rag_library == cfg.workspace
+
+
+def test_the_document_library_can_live_outside_the_workspace(tmp_path):
+    library = tmp_path / "papers"
+    library.mkdir()
+    cfg = load(write(tmp_path, f'[workspace]\nroot = "@WS@"\n[rag]\nlibrary = "{library}"\n'))
+    assert cfg.rag_library == library
+
+
 def test_missing_workspace_section(tmp_path):
     with pytest.raises(ConfigError, match="missing \\[workspace\\]"):
         load(write(tmp_path, '[container]\nimage = "x"\n'))

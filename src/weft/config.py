@@ -58,6 +58,9 @@ class Config:
     @jobs_db: SQLite file holding job state across restarts
     @job_timeout_s: wall-clock limit for a single compilation
     @rag_db: sqlite-vec store for indexed documents
+    @rag_library: where the user's PDFs live; mounted read-only, and
+                  separate from the workspace because a document
+                  collection outlives any one project
     @rag_model: local BGE-M3 weights; None disables the RAG tools
     @http: HTTP transport settings
     """
@@ -69,6 +72,7 @@ class Config:
     jobs_db: Path
     job_timeout_s: int
     rag_db: Path
+    rag_library: Path
     rag_model: Path | None
     http: Http
 
@@ -107,7 +111,7 @@ def load(path: str | Path) -> Config:
     _reject_unknown(jobs, {"database", "timeout_s"}, "jobs")
 
     rag = _table(raw, "rag")
-    _reject_unknown(rag, {"database", "model_path"}, "rag")
+    _reject_unknown(rag, {"database", "model_path", "library"}, "rag")
 
     http = _table(raw, "http")
     _reject_unknown(http, {"host", "port", "token"}, "http")
@@ -120,6 +124,7 @@ def load(path: str | Path) -> Config:
         jobs_db=Path(jobs.get("database", state / "jobs.sqlite")),
         job_timeout_s=int(jobs.get("timeout_s", DEFAULT_JOB_TIMEOUT_S)),
         rag_db=Path(rag.get("database", state / "documents.sqlite")),
+        rag_library=Path(rag["library"]).expanduser() if "library" in rag else workspace,
         rag_model=Path(rag["model_path"]) if "model_path" in rag else None,
         http=Http(
             host=http.get("host", DEFAULT_HTTP_HOST),

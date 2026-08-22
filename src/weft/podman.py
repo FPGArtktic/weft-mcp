@@ -2,8 +2,8 @@
 """Running commands inside the weft-tools container.
 
 Every containerised tool goes through run(). It is the single place that pins
---network=none and mounts nothing but the workspace, so no caller can widen
-the sandbox by accident.
+--network=none and mounts one directory and nothing else, so no caller can
+widen the sandbox by accident.
 """
 
 import subprocess
@@ -41,6 +41,7 @@ def run(
     workspace: Path,
     argv: list[str],
     timeout: float | None = None,
+    readonly: bool = False,
 ) -> Result:
     """run - execute one command inside weft-tools
 
@@ -48,6 +49,9 @@ def run(
     @workspace: host directory bind-mounted at /work; nothing else is visible
     @argv: command and arguments, executed with /work as working directory
     @timeout: wall-clock limit in seconds, or None for no limit
+    @readonly: mount the directory read-only. Used for the document
+               library, which a client may read and nothing may change;
+               tools that need scratch space write to /tmp regardless.
 
     The container gets no network. Under rootless podman the container's root
     maps to the calling user, so whatever the tool writes into the workspace
@@ -64,7 +68,7 @@ def run(
         "--rm",
         "--network=none",
         "-v",
-        f"{workspace}:{CONTAINER_ROOT}",
+        f"{workspace}:{CONTAINER_ROOT}" + (":ro" if readonly else ""),
         "-w",
         str(CONTAINER_ROOT),
         image,

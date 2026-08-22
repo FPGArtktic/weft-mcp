@@ -50,7 +50,7 @@ class Page:
 
 def extract(
     image: str,
-    workspace: Path,
+    library: Path,
     path: str,
     language: str = "eng",
     timeout: float | None = DEFAULT_TIMEOUT,
@@ -58,18 +58,21 @@ def extract(
     """extract - the text of every page of a PDF
 
     @image: weft-tools image name
-    @workspace: sandbox root
-    @path: workspace-relative path to the PDF
+    @library: document root; mounted read-only, so indexing a collection
+              of PDFs cannot write anything into it
+    @path: path to the PDF, relative to @library
     @language: Tesseract language for the pages that need OCR
     @timeout: wall-clock limit for each container run
 
     Return: one Page per page, in order.
 
     Raises IngestError if the document has no pages, SandboxError if @path
-    escapes the workspace, PodmanError if the container could not start.
+    escapes the library, PodmanError if the container could not start.
     """
-    inside = container_path(workspace, path)
-    result = podman.run(image, workspace, ["pdftotext", str(inside), "-"], timeout=timeout)
+    inside = container_path(library, path)
+    result = podman.run(
+        image, library, ["pdftotext", str(inside), "-"], timeout=timeout, readonly=True
+    )
     if result.returncode != 0:
         raise IngestError(f"cannot read {path}: {' '.join(result.output.split())[:200]}")
 
@@ -87,7 +90,7 @@ def extract(
     if not blank:
         return pages
 
-    recognised = _ocr(image, workspace, inside, blank, language, timeout)
+    recognised = _ocr(image, library, inside, blank, language, timeout)
     return [
         Page(number=p.number, text=recognised[p.number], ocr=True) if p.number in recognised else p
         for p in pages
@@ -96,7 +99,7 @@ def extract(
 
 def _ocr(
     image: str,
-    workspace: Path,
+    library: Path,
     document: object,
     pages: list[int],
     language: str,
@@ -118,7 +121,9 @@ def _ocr(
             f"tesseract page.png - -l {shlex.quote(language)} 2>/dev/null || true",
         ]
 
-    result = podman.run(image, workspace, ["sh", "-c", "\n".join(lines)], timeout=timeout)
+    result = podman.run(
+        image, library, ["sh", "-c", "\n".join(lines)], timeout=timeout, readonly=True
+    )
 
     found = {}
     for chunk in result.output.split(MARKER)[1:]:

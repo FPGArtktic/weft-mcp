@@ -69,7 +69,10 @@ The primary client is Claude (Desktop / Code) over MCP stdio or Streamable HTTP.
 - `index_document(path, doc_type)` — PDF ingestion, executed inside `weft-tools`: direct text extraction (`pdftotext`) when a text layer exists; Tesseract OCR for scanned pages. No OCR or PDF binary is a host prerequisite. Chunks carry metadata: file, page, section heading; IEEE standards additionally carry the clause number (e.g. `1800-2023 §13.4`) for precise citation.
 - `search_docs(query, top_k, filter)` — top fragments + source metadata; filter by `doc_type` (standard / handbook / user_guide).
 - `list_indexed_docs()`.
-- Corpus is user-supplied and never committed to the repository.
+- Corpus is user-supplied and never committed to the repository. It lives in its own root,
+  configured as `[rag] library`, mounted read-only and separate from the workspace: a
+  collection of standards outlives any one project, and the index (`[rag] database`) can be
+  placed outside the workspace so one library serves every project.
 
 ### 4.5 Project source indexing — AST + semantic, on demand
 - `index_project(dir)` — **on demand only**: point it at a directory, it indexes what it finds. No file watching, no automatic triggers. Re-running it refreshes the index (files with an unchanged hash are skipped). Builds two indexes:
