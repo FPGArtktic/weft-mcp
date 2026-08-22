@@ -21,7 +21,7 @@ WEFT is under construction, milestone by milestone. What is finished today:
 | Quartus projects | working — `create_project`, `set_assignments`, `get_project_info`, `list_projects` |
 | Quartus compilation | working — `start_compile` as a persistent job, `get_job_status`, `get_job_log`, `cancel_job` |
 | `parse_reports` | working — resources, timing per clock, ranked messages |
-| Source indexing, `search_code`, `get_hierarchy` | not yet |
+| Source indexing | working — `index_project`, `get_module_info`, `get_hierarchy`, `search_code` |
 | Document RAG with OCR | not yet |
 | Documentation generation | not yet |
 | Device programming | not yet |

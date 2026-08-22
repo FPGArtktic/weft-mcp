@@ -15,6 +15,25 @@ the summary you can read in a minute.
 
 Nothing yet.
 
+## [0.3.0] — 2026-08-22
+
+Milestone 3 — AST indexing across three languages.
+
+### Added
+
+- `index`: `index_project`, reading a directory on demand into a symbol store.
+  Verible covers Verilog and SystemVerilog, GHDL covers VHDL; a file whose
+  content hash has not changed is not parsed again, and a file a parser rejects
+  is named with its complaint rather than silently leaving a gap.
+- `index`: `get_hierarchy`, which resolves instance names without regard to
+  case. GHDL folds VHDL identifiers to lower case while Verilog keeps its own,
+  so a SystemVerilog module instantiating a VHDL entity would otherwise never
+  find it. Instances whose module is not indexed are marked unresolved rather
+  than dropped.
+- `index`: `get_module_info` and `search_code`. Search matches text over module,
+  port, parameter and instance names; semantic ranking waits for the embedding
+  store.
+
 ## [0.2.0] — 2026-08-22
 
 Milestone 2 — Quartus compilation as persistent jobs.
@@ -74,5 +93,6 @@ Milestone 1 — the fast loop.
 - `Documentation`: the counter demonstration project, written in
   SystemVerilog, Verilog-2001 and VHDL at once.
 
+[0.3.0]: https://github.com/FPGArtktic/weft-mcp/releases/tag/v0.3.0
 [0.2.0]: https://github.com/FPGArtktic/weft-mcp/releases/tag/v0.2.0
 [0.1.0]: https://github.com/FPGArtktic/weft-mcp/releases/tag/v0.1.0
