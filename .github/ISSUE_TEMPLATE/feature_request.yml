@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: GPL-2.0-only
+name: Feature request
+description: Something WEFT should be able to do
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        WEFT drives a Quartus flow through MCP. It is deliberately not a web UI,
+        not a Vivado front end and not a cloud service — see the non-goals in
+        `PROJECT.md`. Requests that widen the scope will be asked to narrow it.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: >
+        What are you trying to do, and where does WEFT stop being enough?
+        Describe the situation rather than the solution.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you have in mind
+      description: >
+        If you have a shape in mind, sketch it: the tool, its arguments, and
+        what it would return.
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you tried instead
+      description: Existing tools or workarounds, and why they fall short.
+    validations:
+      required: false

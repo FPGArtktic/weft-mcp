@@ -1,0 +1,61 @@
+# SPDX-License-Identifier: GPL-2.0-only
+name: Bug report
+description: Something WEFT did wrong
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please do not report security problems here — see
+        [SECURITY.md](https://github.com/FPGArtktic/weft-mcp/blob/master/SECURITY.md) for how to report those privately.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you asked for, and what WEFT did instead.
+      placeholder: |
+        Called simulate with ... and got ... , expected ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: >
+        The smallest sequence of tool calls that shows it. If a specific HDL
+        source is needed, paste the shortest one that still fails.
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: >
+        Output of `weft --version`, your distribution, `podman --version`, and
+        `quartus_sh --version` if Quartus is involved.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Configuration
+      description: >
+        The relevant part of your weft.toml. **Remove your HTTP token and any
+        licence server address before pasting.**
+      render: toml
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Output
+      description: The tool result or log. Trim it to the part that matters.
+      render: shell
+    validations:
+      required: false
